@@ -12,11 +12,11 @@
 #include "include/crc.h"			// Headers for the CRC functionality
 
 
-/*
+/* 
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
  */
-int mkFS(long deviceSize)
+int mkFS(long deviceSize) 
 {	
 	//Falta corregir errores
 	//Falta el  CRC
@@ -25,19 +25,21 @@ int mkFS(long deviceSize)
 	if(deviceSize > MAX_CAPACITY || deviceSize < MIN_CAPACITY) return -1;
 
 	mem_superblock.crc = 0; //by now
-	mem_superblock.magicNum = MAGIC_NUM;
+	mem_superblock.magicNum = MAGIC_NUM; 
 	mem_superblock.bk_num = deviceSize/BLOCK_SIZE;
 	mem_superblock.in_num = NUM_INODES;
 	mem_superblock.in_size = sizeof(inode);
-	bzero(in_map, mem_superblock.in_num/8);
+	bzero(mem_superblock.in_map, mem_superblock.in_num/8);
 
 	mem_superblock.bk_map = (char*) calloc(mem_superblock.bk_num/8 + ((mem_superblock.bk_num%8 != 0) ? 1 : 0),  sizeof(char));
 	bitmap_setbit(mem_superblock.bk_map,  0, 1);
 	bitmap_setbit(mem_superblock.bk_map,  1, 1);
 
-	mem_inodes = (inode*)calloc(mem_superblock.in_num, sizeof(inode));
+	mem_inodes = (inode*)calloc(BLOCK_SIZE, sizeof(inode)); //Padded to block size with 0, but inodes will only extist until *(NUM_INODES-1)
+	mem_superblock.padding = (char*) calloc(BLOCK_SIZE - 5*sizeof(uint32_t) - 7*sizeof(char),sizeof(char)); //Filling the pading so the structure occupies a block
 
-	unmountFS();
+
+	unmountFS(); //Write changes in the disk
 	return 0;
 
 }
@@ -57,6 +59,9 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
+
+	//Write superbock and inode bock
+
 	return -1;
 }
 

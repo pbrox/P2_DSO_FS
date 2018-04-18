@@ -6,6 +6,9 @@
  * @date	01/03/2017
  */
 
+#include <stdlib.h>
+#include <strings.h>
+#include <stdint.h>
 #define MAX_CAPACITY 10485760
 #define MIN_CAPACITY 51200
 
@@ -28,6 +31,7 @@ typedef struct {
 	uint32_t in_size; //Size in bytes of an inode
 	char in_map[5];
 	char * bk_map;//[bk_num/8 + (bk_num%8 == 0) ? 0 : 1];
+	char * padding;
 
 
 } superblock;
