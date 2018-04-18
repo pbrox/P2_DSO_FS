@@ -25,14 +25,14 @@ int mkFS(long deviceSize)
 	if(deviceSize > MAX_CAPACITY || deviceSize < MIN_CAPACITY) return -1;
 
 	mem_superblock.crc = 0; //by now
-	mem_superblock.magicNum = MAGIC_NUM; 
-	mem_superblock.bk_num = deviceSize/BLOCK_SIZE;
-	mem_superblock.in_num = NUM_INODES;
-	mem_superblock.in_size = sizeof(inode);
-	bzero(mem_superblock.in_map, mem_superblock.in_num/8);
+	mem_superblock.magicNum = MAGIC_NUM;  //Setting magic number
+	mem_superblock.bk_num = deviceSize/BLOCK_SIZE; //Setting the numBlocks
+	mem_superblock.in_num = NUM_INODES; //Setting the inodes
+	mem_superblock.in_size = sizeof(inode);//setting the inode size
+	bzero(mem_superblock.in_map, mem_superblock.in_num/8); //Sets all inodes as free
 
-	mem_superblock.bk_map = (char*) calloc(mem_superblock.bk_num/8 + ((mem_superblock.bk_num%8 != 0) ? 1 : 0),  sizeof(char));
-	bitmap_setbit(mem_superblock.bk_map,  0, 1);
+	mem_superblock.bk_map = (char*) calloc(mem_superblock.bk_num/8 + ((mem_superblock.bk_num%8 != 0) ? 1 : 0),  sizeof(char)); //Creates the bockmap
+	bitmap_setbit(mem_superblock.bk_map,  0, 1); //Set first two bocks as used
 	bitmap_setbit(mem_superblock.bk_map,  1, 1);
 
 	mem_inodes = (inode*)calloc(BLOCK_SIZE, sizeof(inode)); //Padded to block size with 0, but inodes will only extist until *(NUM_INODES-1)

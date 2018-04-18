@@ -45,4 +45,4 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 }
 
 inode * mem_inodes;
-superblock mem_superblock;
+superblock * mem_superblock;
