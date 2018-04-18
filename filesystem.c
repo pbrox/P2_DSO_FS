@@ -17,8 +17,29 @@
  * @return 	0 if success, -1 otherwise.
  */
 int mkFS(long deviceSize)
-{
-	return -1;
+{	
+	//Falta corregir errores
+	//Falta el  CRC
+	//Cómo poner estos dos bloques (superbk y inodes_bk) a 0 antes de usarlos?
+
+	if(deviceSize > MAX_CAPACITY || deviceSize < MIN_CAPACITY) return -1;
+
+	mem_superblock.crc = 0; //by now
+	mem_superblock.magicNum = MAGIC_NUM;
+	mem_superblock.bk_num = deviceSize/BLOCK_SIZE;
+	mem_superblock.in_num = NUM_INODES;
+	mem_superblock.in_size = sizeof(inode);
+	bzero(in_map, mem_superblock.in_num/8);
+
+	mem_superblock.bk_map = (char*) calloc(mem_superblock.bk_num/8 + ((mem_superblock.bk_num%8 != 0) ? 1 : 0),  sizeof(char));
+	bitmap_setbit(mem_superblock.bk_map,  0, 1);
+	bitmap_setbit(mem_superblock.bk_map,  1, 1);
+
+	mem_inodes = (inode*)calloc(mem_superblock.in_num, sizeof(inode));
+
+	unmountFS();
+	return 0;
+
 }
 
 /*
