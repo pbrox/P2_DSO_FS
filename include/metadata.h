@@ -24,14 +24,14 @@ typedef struct {
 
 typedef struct {
 	
-	uint32_t crc; //Cyclic rendundacy check, to check its integrity 32 bits CRC used
 	uint32_t magicNum; 
 	uint32_t bk_num; //Number of blocks
+	uint32_t crc; //Cyclic rendundacy check, to check its integrity 32 bits CRC used
 	uint32_t in_num; // Numbe of inodes
 	uint32_t in_size; //Size in bytes of an inode
 	char in_map[5];
-	char * bk_map;//[bk_num/8 + (bk_num%8 == 0) ? 0 : 1];
-	char * padding;
+	char  bk_map[(MAX_CAPACITY/BLOCK_SIZE)/8];//max num bocks/8
+	char padding[BLOCK_SIZE - 5*4 -645];  //Not touched, it is implicity initialited to 0 when declared as gobal
 
 
 } superblock;
@@ -44,5 +44,5 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
     bitmap_[(i_ >> 3)] &= ~(1 << (i_ & 0x07));
 }
 
-inode * mem_inodes;
-superblock * mem_superblock;
+inode * mem_inodes; //Impicity to 0
+superblock mem_superblock; //Implicity to 0 

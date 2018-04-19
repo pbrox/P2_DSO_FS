@@ -20,25 +20,24 @@ int mkFS(long deviceSize)
 {	
 	//Falta corregir errores
 	//Falta el  CRC
-	//Cómo poner estos dos bloques (superbk y inodes_bk) a 0 antes de usarlos?
 
 	if(deviceSize > MAX_CAPACITY || deviceSize < MIN_CAPACITY) return -1;
 
-	mem_superblock.crc = 0; //by now
+	//SuperBlock creation
+
 	mem_superblock.magicNum = MAGIC_NUM;  //Setting magic number
 	mem_superblock.bk_num = deviceSize/BLOCK_SIZE; //Setting the numBlocks
+	mem_superblock.crc = 0; //by now 
 	mem_superblock.in_num = NUM_INODES; //Setting the inodes
 	mem_superblock.in_size = sizeof(inode);//setting the inode size
-	bzero(mem_superblock.in_map, mem_superblock.in_num/8); //Sets all inodes as free
-
-	mem_superblock.bk_map = (char*) calloc(mem_superblock.bk_num/8 + ((mem_superblock.bk_num%8 != 0) ? 1 : 0),  sizeof(char)); //Creates the bockmap
+	//Regarding the blockmap, it is initiallized automaticaly to 0 as it is global
 	bitmap_setbit(mem_superblock.bk_map,  0, 1); //Set first two bocks as used
 	bitmap_setbit(mem_superblock.bk_map,  1, 1);
 
-	mem_inodes = (inode*)calloc(BLOCK_SIZE, sizeof(inode)); //Padded to block size with 0, but inodes will only extist until *(NUM_INODES-1)
-	mem_superblock.padding = (char*) calloc(BLOCK_SIZE - 5*sizeof(uint32_t) - 7*sizeof(char),sizeof(char)); //Filling the pading so the structure occupies a block
-
-
+	//Padding is also automaticaly initiaized to 0's
+	//Inodes Part 
+	mem_inodes = (inode*)calloc(NUM_INODES, sizeof(inode)); //Set to 0's
+	if(!mem_inodes) return -1;
 	unmountFS(); //Write changes in the disk
 	return 0;
 
@@ -49,8 +48,28 @@ int mkFS(long deviceSize)
  * @return 	0 if success, -1 otherwise.
  */
 int mountFS(void)
-{
-	return -1;
+{	
+	//Gets the superblock
+	if(bread("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
+
+	//Check magic number
+	if(mem_superblock.magicNum != MAGIC_NUM) return -1;
+
+	//Checks the number of inodes and alocates its memory
+	if(mem_superblock.in_num != NUM_INODES) return -1;
+	char raw[BLOCK_SIZE];
+	//Gets inodes
+	if(bread("disk.dat", 1, raw) < 0) return -1;
+
+	//Allocates memory for those inodes
+	mem_inodes = (inode *)calloc(mem_superblock.in_num, mem_superblock.in_size);
+	if(!mem_inodes) return -1;
+
+	//Copies inodes
+	memcpy(mem_inodes, raw, mem_superblock.in_num*mem_superblock.in_size);
+
+	return 0;
+
 }
 
 /*
@@ -59,10 +78,22 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
+	//Writes superbock and inode block
+	//Computes the CRC -- TO_DO
+	//Write the two metadata bocks of the fiesystem
 
-	//Write superbock and inode bock
+	//Writes SuperBock, no need padding because is exactly in memory 2048 bytes
+	if(bwrite("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
 
-	return -1;
+	//Inodes part
+	char aux_blk[BLOCK_SIZE]; //Implicity to 0's
+	memcpy(aux_blk, mem_inodes, NUM_INODES*sizeof(inode)); //Writes exisixting inodes
+	if(bwrite("disk.dat", 1, aux_blk) < 0) return -1;
+
+	//Free used memory
+	free(mem_inodes);
+
+	return 0;
 }
 
 /*
