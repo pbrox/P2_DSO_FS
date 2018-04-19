@@ -48,6 +48,41 @@ int balloc(){
 	return -1;
 }
 
+int nametoi(char * name){
+
+	for(int i = 0; i < mem_superblock.in_num; ++i){ //For each inode allocated we see if the name is the same
+		//If the inode exists and the name is the same, returns the index (the inode number)
+		if(bitmap_getbit(mem_superblock.in_map, i) && strcmp(name, mem_inodes[i].name) == 0) return i;
+	}
+
+	return -1; //If no inode is found returns error 
+}
+
+//Frees an inode
+int ifree(int inode){
+	//If the inode was not allocated or is not a valid one return error
+	if(inode < 0 || inode > 40 || !bitmap_getbit(mem_superblock.in_map, inode)) return -1;
+	bitmap_setbit(mem_superblock.in_map, inode, 0); //Sets the inode to not used
+	return 0;
+}
+
+//Frees a block
+int bfree(int block){
+
+	if(block < 0 || block > mem_superblock.bk_num || !bitmap_getbit(mem_superblock.bk_map, block)) return -1;
+	bitmap_setbit(mem_superblock.bk_map, block, 0); //Sets the block to not used
+
+	return 0;
+
+}
+
+ //Return the number of blocks needed to fit the given size
+int numblocks(int size){
+	return (size/BLOCK_SIZE + ((size % BLOCK_SIZE == 0) ? 0 : 1));
+	//It is the number of blocks that are totally used and 1 more if there's still size to put
+}
+
+
 /* 
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
@@ -152,9 +187,7 @@ int createFile(char *fileName)
 {
 	if(strlen(fileName)>31) return -2; //If the file_name is bigger than 32 CHECKK!
 	//Checks uniqueness
-	for(int i = 0; i < mem_superblock.in_num; ++i){ //For each inode allocated we see if the name is the same
-		if(bitmap_getbit(mem_superblock.in_map, i) && !strcmp(fileName, mem_inodes[i].name)) return -1;
-	}
+	if(nametoi(fileName) != -1) return -1; //The file already exist if nametoi finds it, if it returns error the file didn't exist
 	int inode_id, indirect_id;
 	//Allocates a new inode
 	if((inode_id = ialloc()) < 0) return -2;
@@ -179,8 +212,31 @@ int createFile(char *fileName)
  * @return	0 if success, -1 if the file does not exist, -2 in case of error..
  */
 int removeFile(char *fileName)
-{
-	return -2;
+{	
+	int inode_t = nametoi(fileName);
+	if(inode_t < 0) return -1; //The file does not exist, return error
+
+	//Checks if the file is opened, if so, closes it to avoid problems
+	if(bitmap_getbit(file_table->is_opened,inode_t)) closeFile(inode_t);
+
+	//Gets the number of blocks
+	int num_blk = numblocks(mem_inodes[inode_t].size);
+
+	//Reads the indirect block
+	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
+	if(bread("disk.dat", mem_inodes[inode_t].indirect, (char*)indirect) < 0) return -2;
+
+	//Frees all the blocks
+	for(int i = 0; i < num_blk; ++i) if(bfree(indirect[i]) < 0) return -1; //If any error return it
+		//Behaviour to DEFINEE!
+
+	//Frees indirect block
+	if(bfree( mem_inodes[inode_t].indirect) < 0) return -1; //Same as above
+
+	//Frees inode
+	if(ifree(inode_t) < 0) return -1; //Undefined also
+
+	return 0;
 }
 
 /*
@@ -188,8 +244,16 @@ int removeFile(char *fileName)
  * @return	The file descriptor if possible, -1 if file does not exist, -2 in case of error..
  */
 int openFile(char *fileName)
-{
-	return -2;
+{	
+	int inode_p = nametoi(fileName);//Gets the inode associated to that name
+	
+	if(inode_p < 0) return -1; //The file does not exist
+	//Searchs the file inside allocated inodes
+	if(bitmap_getbit(file_table->is_opened, inode_p)) return -2; //The file is already opened
+	bitmap_setbit(file_table->is_opened,inode_p,1); //Set the file as opened
+	file_table->file_pos[inode_p] = 0; //Sets the file pointer to 0
+	
+	return inode_p;
 }
 
 /*
@@ -197,8 +261,13 @@ int openFile(char *fileName)
  * @return	0 if success, -1 otherwise.
  */
 int closeFile(int fileDescriptor)
-{
-	return -1;
+{	
+	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
+	//Duda con esto
+	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1; //The file is already closed
+	bitmap_setbit(file_table->is_opened,fileDescriptor,0); //Set the file as closed
+	//No need to put the pointer to 0 because it is initializated as 0
+	return 0;
 }
 
 /*

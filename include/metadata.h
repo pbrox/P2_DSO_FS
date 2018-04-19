@@ -53,4 +53,4 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 
 inode * mem_inodes; 
 openFile_table * file_table;
-superblock mem_superblock; //Implicity to 0 
+superblock mem_superblock; //Implicity to 0  

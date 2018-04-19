@@ -17,3 +17,9 @@ int balloc();
 
 //Frees ablock
 int bfree(int block);
+
+//Searchs an inode by name
+int nametoi(char * name);
+
+//Return the number of blocks needed to fit the given size
+int numblocks(int size);
