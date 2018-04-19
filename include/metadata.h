@@ -8,11 +8,12 @@
 
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
 #include <stdint.h>
 #define MAX_CAPACITY 10485760
 #define MIN_CAPACITY 51200
 
-
+//Notes in design the number of occupied bloks is size/sizeofblock + (size % sizeofblock != 0);
 typedef struct {
 
 	uint32_t crc; //Cyclic rendundacy check, to check its integrity 32 bits CRC used
@@ -36,6 +37,12 @@ typedef struct {
 
 } superblock;
 
+typedef struct{
+	char is_opened[5]; //Each bit corresponds to a file
+	uint32_t file_pos[40]; //Each position is the file pointer
+
+} openFile_table;
+
 #define bitmap_getbit(bitmap_, i_) (bitmap_[i_ >> 3] & (1 << (i_ & 0x07)))
 static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
   if (val_)
@@ -44,5 +51,6 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
     bitmap_[(i_ >> 3)] &= ~(1 << (i_ & 0x07));
 }
 
-inode * mem_inodes; //Impicity to 0
+inode * mem_inodes; 
+openFile_table * file_table;
 superblock mem_superblock; //Implicity to 0 

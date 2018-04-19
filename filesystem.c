@@ -5,12 +5,48 @@
  * @brief 	Implementation of the core file system funcionalities and auxiliary functions.
  * @date	01/03/2017
  */
+//TO DO
+// CRC
+//ASK DAVID NAME_FILES AND  FIXXX!!!
 
 #include "include/filesystem.h"		// Headers for the core functionality
 #include "include/auxiliary.h"		// Headers for auxiliary functions
 #include "include/metadata.h"		// Type and structure declaration of the file system
 #include "include/crc.h"			// Headers for the CRC functionality
 
+
+int ialloc(){
+
+	for(int i = 0; i < mem_superblock.in_num; ++i){
+
+		if(!bitmap_getbit(mem_superblock.in_map, i)){ //i.e the node is free
+			//The first free inode
+			bzero((mem_inodes+i),sizeof(inode)); //Clearing the inode (not done in free)
+			bitmap_setbit(mem_superblock.in_map, i, 1); //Sets the inode as used
+			return i; //Returns its id
+		}
+	}
+
+	return -1; //Error in case of not found inode
+}
+
+int balloc(){
+
+	char blank[BLOCK_SIZE] = {0}; //to 0 by default
+
+	for(int i = 0; i < mem_superblock.bk_num; ++i){
+
+		if(!bitmap_getbit(mem_superblock.bk_map, i)) { //The block is free
+
+			if(bwrite("disk.dat", i, blank) < 0) return -1;
+			bitmap_setbit(mem_superblock.bk_map, i, 1); //Sets it as used
+			return i;
+
+		}
+	}
+
+	return -1;
+}
 
 /* 
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -68,6 +104,10 @@ int mountFS(void)
 	//Copies inodes
 	memcpy(mem_inodes, raw, mem_superblock.in_num*mem_superblock.in_size);
 
+	//Allocates memory for the file table, sets its to 0 (calloc call)
+	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
+	if(!file_table) return -1;
+
 	return 0;
 
 }
@@ -82,16 +122,24 @@ int unmountFS(void)
 	//Computes the CRC -- TO_DO
 	//Write the two metadata bocks of the fiesystem
 
+	//Checks open files and closes opened ones //DUDA QUITAR?
+	for(int i = 0; i < mem_superblock.in_num;++i){
+		if(bitmap_getbit(file_table->is_opened, i)){
+			if(closeFile(i) < 0) return -1;
+		}
+	}
+
 	//Writes SuperBock, no need padding because is exactly in memory 2048 bytes
 	if(bwrite("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
 
 	//Inodes part
-	char aux_blk[BLOCK_SIZE]; //Implicity to 0's
+	char aux_blk[BLOCK_SIZE] = {0}; //Implicity to 0's
 	memcpy(aux_blk, mem_inodes, NUM_INODES*sizeof(inode)); //Writes exisixting inodes
 	if(bwrite("disk.dat", 1, aux_blk) < 0) return -1;
 
 	//Free used memory
 	free(mem_inodes);
+	free(file_table);
 
 	return 0;
 }
@@ -102,7 +150,28 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	return -2;
+	if(strlen(fileName)>31) return -2; //If the file_name is bigger than 32 CHECKK!
+	//Checks uniqueness
+	for(int i = 0; i < mem_superblock.in_num; ++i){ //For each inode allocated we see if the name is the same
+		if(bitmap_getbit(mem_superblock.in_map, i) && !strcmp(fileName, mem_inodes[i].name)) return -1;
+	}
+	int inode_id, indirect_id;
+	//Allocates a new inode
+	if((inode_id = ialloc()) < 0) return -2;
+	//Allocates the indirect block
+	if((indirect_id = balloc()) < 0 ){ //If cannot find a block
+		ifree(inode_id); //Frees the allocated inode
+		return -1;
+	}
+
+	//Fills the inode CRC not covered yet
+	//mem_inodes[inode_id].crc = ...;
+	//I think ialloc sets to 0 check
+	//mem_inodes[inode_id].size = 0;
+	mem_inodes[inode_id].indirect = indirect_id; //The block is set to 0
+	//The indirect occupied blocks is not needed because it can be computed
+	strcpy(mem_inodes[inode_id].name, fileName);
+	return 0;
 }
 
 /*
