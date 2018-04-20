@@ -285,11 +285,19 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-
+	//Check file descriptor 
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
 	//First, we have to check if the file to be written is opened or not.
 	if(!bitmap_getbit(filetable->is_opened, fileDescriptor)) return -1;
 
+	//Now we prepare parameters in order to write in the current file pointer
+
+	int total_blk = num(mem_superblock[fileDescriptor].size);
+	int current_blk = seek_ptr/BLOCK_SIZE;
+	int offset_current_blk = seek_ptr % BLOCK_SIZE;
+
+
+	
 	int seek_ptr = file_table.file_pos[fileDescriptor];
 
 	//Gets the number of blocks
@@ -343,7 +351,6 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		}
 	} 
 
-	fwrite(buffer,1,sizeof(buffer),pFile);
 	return -1;
 }
 
