@@ -10,8 +10,8 @@
 #include <strings.h>
 #include <string.h>
 #include <stdint.h>
-#define MAX_CAPACITY 10485760
-#define MIN_CAPACITY 51200
+#define MAX_CAPACITY 10485760 // 10 MB
+#define MIN_CAPACITY 51200 // 50 KB
 
 //Notes in design the number of occupied bloks is size/sizeofblock + (size % sizeofblock != 0);
 typedef struct {
@@ -28,11 +28,11 @@ typedef struct {
 	uint32_t magicNum; 
 	uint32_t bk_num; //Number of blocks
 	uint32_t crc; //Cyclic rendundacy check, to check its integrity 32 bits CRC used
-	uint32_t in_num; // Numbe of inodes
+	uint32_t in_num; // Number of inodes
 	uint32_t in_size; //Size in bytes of an inode
-	char in_map[5];
+	char in_map[5]; // Inode map
 	char  bk_map[(MAX_CAPACITY/BLOCK_SIZE)/8];//max num bocks/8
-	char padding[BLOCK_SIZE - 5*4 -645];  //Not touched, it is implicity initialited to 0 when declared as gobal
+	char padding[BLOCK_SIZE - 5*4 - 645];  //Not touched, it is implicity initialited to 0 when declared as gobal
 
 
 } superblock;

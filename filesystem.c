@@ -285,6 +285,65 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
+
+	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
+	//First, we have to check if the file to be written is opened or not.
+	if(!bitmap_getbit(filetable->is_opened, fileDescriptor)) return -1;
+
+	int seek_ptr = file_table.file_pos[fileDescriptor];
+
+	//Gets the number of blocks
+	//int num_blk = numblocks(mem_inodes[inode_t].size);
+
+	int a = mem_inodes[fileDescriptor].size - seek_ptr;
+	int blocksOffset = BLOCK_SIZE - a;
+	int nBytes = numBytes - blocksOffset;
+
+	//Gets the number of blocks
+	int num_blk = numblocks(nBytes);
+
+	int blk;
+	if(nBytes != 0){
+		int blk = balloc();
+	}
+
+
+
+	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
+	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect, (char*)indirect) < 0) return -1;
+
+	//If the file is open, then we have to now if the current file is empty or not (ESTO NO ESTA HECHO, DE MOMENTO SOLO LEE Y COPIA)
+	char aux_blk[BLOCK_SIZE] = {0};
+	if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
+
+
+	for(int i = seek_ptr; i < BLOCK_SIZE; ++i){
+		
+		memcpy(aux_blk[i], buffer, numBytes);
+	}
+	
+	//If a new block is to be used it needs to be allocated
+	if(seek_ptr%BLOCK_SIZE != 0){
+		
+
+	}
+
+	for(int i = seek_ptr; i < numBytes; ++i){
+
+	}
+
+	if(bwrite("disk.dat", seek_ptr/BLOCK_SIZE, aux_blk) < 0) return -1;
+
+
+	//TODO A PARTIR DE AQUI SOBRA
+	//Asumo que existe una correspondencia 1:1 entre inode y fileDescriptor
+	if(bread("disk.dat", , aux_blk)){
+		for(int i = 0; i < numBytes; ++i){
+
+		}
+	} 
+
+	fwrite(buffer,1,sizeof(buffer),pFile);
 	return -1;
 }
 
@@ -295,6 +354,19 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
+
+	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
+
+	if(whence == FS_SEEK_BEGIN){
+		filetable.file_pos[fileDescriptor] = 0;
+
+	}else if(whence == FS_SEEK_END){
+		filetable.file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size;
+
+	}else if(whence == FS_SEEK_CUR){
+
+
+	}
 	return -1;
 }
 
