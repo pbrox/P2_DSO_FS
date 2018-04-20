@@ -354,20 +354,29 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
+	//Error if invalid file descriptor or the file is closed
+	if(fileDescriptor < 0 || fileDescriptor > 40 || !bitmap_getbit(file_table->is_opened,fileDescriptor) ) return -1;
 
-	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
-
-	if(whence == FS_SEEK_BEGIN){
-		filetable.file_pos[fileDescriptor] = 0;
-
-	}else if(whence == FS_SEEK_END){
-		filetable.file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size;
-
-	}else if(whence == FS_SEEK_CUR){
-
+	switch(fileDescriptor){
+		
+		case FS_SEEK_BEGIN:
+			filetable.file_pos[fileDescriptor] = 0; //If seek beguinputs the pointer to 0 
+			break;
+		case FS_SEEK_END:
+			filetable.file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size; //If seek to end, sets at the size of the file (which in fact is the place to write
+			break;
+		case FS_SEEK_CUR:
+			int aux_p = filetable.file_pos[fileDescriptor] + offset; //Gets the new pointer
+			if(aux_p < 0 || aux_p > mem_inodes[fileDescriptor].size) return -1; //If the position is not valid returns error
+			filetable.file_pos[fileDescriptor] = aux_p; //Sets the pointer
+			break;
+		default:
+			return -1; //if option is not correct return error
 
 	}
-	return -1;
+
+	return 0; //Return success
+
 }
 
 /*
