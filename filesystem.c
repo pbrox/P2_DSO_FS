@@ -7,7 +7,7 @@
  */
 //TO DO
 // CRC
-//ASK DAVID NAME_FILES AND  FIXXX!!!
+//ASK DAVID NAME_FILES AND  FIXXX!!! 
 
 #include "include/filesystem.h"		// Headers for the core functionality
 #include "include/auxiliary.h"		// Headers for auxiliary functions
@@ -104,17 +104,15 @@ int mkFS(long deviceSize)
 	//Regarding the blockmap, it is initiallized automaticaly to 0 as it is global
 	bitmap_setbit(mem_superblock.bk_map,  0, 1); //Set first two bocks as used
 	bitmap_setbit(mem_superblock.bk_map,  1, 1);
-
 	//Padding is also automaticaly initiaized to 0's
-	//Inodes Part 
-	mem_inodes = (inode*)calloc(NUM_INODES, sizeof(inode)); //Set to 0's
-	if(!mem_inodes) return -1;
 
-	//Allocates memory for the file table, sets its to 0 (calloc call)
-	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
-	if(!file_table) return -1;
+	//Writes SuperBock, no need padding because is exactly in memory 2048 bytes
+	if(bwrite("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
 
-	unmountFS(); //Write changes in the disk
+	//Inodes Part, write a 0's block, no inode is created
+	char aux_blank_inodes[BLOCK_SIZE] = {0}; 
+	if(bwrite("disk.dat", 1, aux_blank_inodes) < 0) return -1; //Write the whole block as 0's
+
 	return 0;
 
 }
@@ -143,6 +141,10 @@ int mountFS(void)
 
 	//Copies inodes
 	memcpy(mem_inodes, raw, mem_superblock.in_num*mem_superblock.in_size);
+
+	//Allocates memory for the file table, sets its to 0 (calloc call)
+	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
+	if(!file_table) return -1;
 
 	return 0;
 
