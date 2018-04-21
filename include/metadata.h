@@ -12,6 +12,9 @@
 #include <stdint.h>
 #define MAX_CAPACITY 10485760 // 10 MB
 #define MIN_CAPACITY 51200 // 50 KB
+#define MAGIC_NUM 1 // 50 KB
+#define NUM_INODES 40 // 50 KB
+
 
 //Notes in design the number of occupied bloks is size/sizeofblock + (size % sizeofblock != 0);
 typedef struct {

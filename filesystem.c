@@ -109,6 +109,11 @@ int mkFS(long deviceSize)
 	//Inodes Part 
 	mem_inodes = (inode*)calloc(NUM_INODES, sizeof(inode)); //Set to 0's
 	if(!mem_inodes) return -1;
+
+	//Allocates memory for the file table, sets its to 0 (calloc call)
+	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
+	if(!file_table) return -1;
+
 	unmountFS(); //Write changes in the disk
 	return 0;
 
@@ -138,10 +143,6 @@ int mountFS(void)
 
 	//Copies inodes
 	memcpy(mem_inodes, raw, mem_superblock.in_num*mem_superblock.in_size);
-
-	//Allocates memory for the file table, sets its to 0 (calloc call)
-	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
-	if(!file_table) return -1;
 
 	return 0;
 
@@ -288,70 +289,102 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	//Check file descriptor 
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
 	//First, we have to check if the file to be written is opened or not.
-	if(!bitmap_getbit(filetable->is_opened, fileDescriptor)) return -1;
+	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1;
+
+//FALTA LA PARTE DE QUE SI TE PASAS SE ESCRIBA HASTA DONDE PUEDAS: ALBA HAZ COMMIT DE READ()
 
 	//Now we prepare parameters in order to write in the current file pointer
 
-	int total_blk = num(mem_superblock[fileDescriptor].size);
+	int seek_ptr = file_table->file_pos[fileDescriptor];
+
+	int file_blks = numblocks(mem_inodes[fileDescriptor].size);
+
 	int current_blk = seek_ptr/BLOCK_SIZE;
-	int offset_current_blk = seek_ptr % BLOCK_SIZE;
+	//int offset_current_blk = seek_ptr % BLOCK_SIZE; Da de error de UNUSED, me he dejado un caso: REVISAR (quito para compilar)
+	int bytes_wr_first_bk = BLOCK_SIZE - seek_ptr;
+	int towrite_bytes = numBytes - bytes_wr_first_bk;//bytes to write in blocks that are not where fp is
+	//Le falta un +1 que le quite porque hace referencia a tener que escribir el bloque del fp y me jodia para el to_alloc
+	int towrite_blks = towrite_bytes/BLOCK_SIZE + (towrite_bytes % BLOCK_SIZE == 0)? 0 : 1 ; 
+
+	/* The difference between the file size in blocks and the blocks to be written from the
+	 file pointer will result in the number of blocks to be allocated. It will be 0 or negative
+	 if there is no need to allocate blocks*/
+	int to_alloc = (current_blk + towrite_blks) - file_blks;
 
 
-	
-	int seek_ptr = file_table.file_pos[fileDescriptor];
+	//end of parameters preparation
 
-	//Gets the number of blocks
-	//int num_blk = numblocks(mem_inodes[inode_t].size);
+	//BLOCK SERVING:
 
-	int a = mem_inodes[fileDescriptor].size - seek_ptr;
-	int blocksOffset = BLOCK_SIZE - a;
-	int nBytes = numBytes - blocksOffset;
-
-	//Gets the number of blocks
-	int num_blk = numblocks(nBytes);
-
-	int blk;
-	if(nBytes != 0){
-		int blk = balloc();
-	}
-
-
+	//When this counter reaches 0 we now we have to start allocating blocks
+	//If the blocks to alloc is 0 or negative, there is no need to do so
+	int alloc_counter = (to_alloc > 0 )? to_alloc : -1;
+	int written_bytes = 0;
 
 	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
 	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect, (char*)indirect) < 0) return -1;
 
-	//If the file is open, then we have to now if the current file is empty or not (ESTO NO ESTA HECHO, DE MOMENTO SOLO LEE Y COPIA)
-	char aux_blk[BLOCK_SIZE] = {0};
-	if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
+	for(int i = 0; i < towrite_blks + 1; ++i)
+	{
+		char aux_blk[BLOCK_SIZE] = {0};
 
-
-	for(int i = seek_ptr; i < BLOCK_SIZE; ++i){
-		
-		memcpy(aux_blk[i], buffer, numBytes);
-	}
-	
-	//If a new block is to be used it needs to be allocated
-	if(seek_ptr%BLOCK_SIZE != 0){
-		
-
-	}
-
-	for(int i = seek_ptr; i < numBytes; ++i){
-
-	}
-
-	if(bwrite("disk.dat", seek_ptr/BLOCK_SIZE, aux_blk) < 0) return -1;
-
-
-	//TODO A PARTIR DE AQUI SOBRA
-	//Asumo que existe una correspondencia 1:1 entre inode y fileDescriptor
-	if(bread("disk.dat", , aux_blk)){
-		for(int i = 0; i < numBytes; ++i){
-
+		if(alloc_counter == 0)
+		{
+			int alloc_block;
+			if((alloc_block = balloc()) < 0 ) return -1;
+			//Write the block
+			memcpy(aux_blk, buffer + written_bytes, BLOCK_SIZE);
+			//Write that block back into the disk
+			written_bytes += BLOCK_SIZE;
+			if(bwrite("disk.dat", alloc_block, aux_blk) < 0) return -1;
+			//Decrease counter & update internal pointer to next position to be written
+			seek_ptr += written_bytes;
 		}
-	} 
+		else 
+		{
+		//ESTE ÚTIMO CASO SE RECONOCE CUANDO SOY EL LAST BLOCK	
 
-	return -1;
+			/*IF NO NEED TO ALLOCATE*/
+			// primero se copia y luego se reescribe-->Para dejar el 'padding'
+			/*IF NEED TO ALLOCATE*/
+			// balloc() y escribelo
+			//Copy the current block into an auxiliary block
+
+			//ULTIMO CASO
+			if(i == towrite_blks - 2)
+			{
+				if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
+				//Write as much content of the buffer as possible in the remaining space 
+				//AQUI NO QUIERO ESCRIBIR BLK_SIZE, SINO: [#######^cacacaca000]
+				memcpy(aux_blk, buffer + written_bytes, towrite_bytes + bytes_wr_first_bk - written_bytes);//La suma podria ser numBytes
+				//Write that block back into the disk
+				if(bwrite("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
+				written_bytes += towrite_bytes + bytes_wr_first_bk - written_bytes; // se puede qutar el -written_bytes y poner = 
+				//Decrease counter & update internal pointer to next position to be written
+				seek_ptr += written_bytes;
+			}
+			else//Cualquier otro caso donde no haya que alocar
+			{
+
+				if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
+				//Write as much content of the buffer as possible in the remaining space 
+				memcpy(aux_blk, buffer + written_bytes, BLOCK_SIZE);
+				//Write that block back into the disk
+				if(bwrite("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
+				written_bytes += BLOCK_SIZE;
+				//Decrease counter & update internal pointer to next position to be written
+				seek_ptr += written_bytes;
+				--alloc_counter;
+			}
+		}
+
+	}
+
+
+
+	file_table->file_pos[fileDescriptor] = seek_ptr;
+
+	return written_bytes; 
 }
 
 
@@ -367,15 +400,15 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 	switch(fileDescriptor){
 		
 		case FS_SEEK_BEGIN:
-			filetable.file_pos[fileDescriptor] = 0; //If seek beguinputs the pointer to 0 
+			file_table.file_pos[fileDescriptor] = 0; //If seek beguinputs the pointer to 0 
 			break;
 		case FS_SEEK_END:
-			filetable.file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size; //If seek to end, sets at the size of the file (which in fact is the place to write
+			file_table.file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size; //If seek to end, sets at the size of the file (which in fact is the place to write
 			break;
 		case FS_SEEK_CUR:
-			int aux_p = filetable.file_pos[fileDescriptor] + offset; //Gets the new pointer
+			int aux_p = file_table.file_pos[fileDescriptor] + offset; //Gets the new pointer
 			if(aux_p < 0 || aux_p > mem_inodes[fileDescriptor].size) return -1; //If the position is not valid returns error
-			filetable.file_pos[fileDescriptor] = aux_p; //Sets the pointer
+			file_table.file_pos[fileDescriptor] = aux_p; //Sets the pointer
 			break;
 		default:
 			return -1; //if option is not correct return error
