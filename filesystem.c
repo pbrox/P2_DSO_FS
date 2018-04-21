@@ -301,12 +301,29 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	
 	for (int i = 0; i<blk_toRead; ++i){//Read all the blocks
 	
-		if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], buffer) < 0) return -1; //Read the current block
+		if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], indirect) < 0) return -1; //Read the current block
 		
-		if(blk_toRead == 1){ seek_ptr += size_toRead; size_read = size_toRead; }
-		else if(i == 0){ seek_ptr += BLOCK_SIZE - seek_ptr; size_read += BLOCK_SIZE - seek_ptr;}
-		else if(i == blk_toRead - 1){ seek_ptr += size_toRead - size_read; size_read += size_toRead - size_read; }
-		else { seek_ptr += BLOCK_SIZE; size_ read += BLOCK_SIZE; }
+		if(blk_toRead == 1){ 
+			memcpy(aux_blk, buffer + size_read, size_toRead);
+			seek_ptr += size_toRead; 
+			size_read = size_toRead; 
+		}
+		else if(i == 0){ 
+			memcpy(aux_blk, buffer + size_read, BLOCK_SIZE - seek_ptr);
+			seek_ptr += BLOCK_SIZE - seek_ptr; 
+			size_read += BLOCK_SIZE - seek_ptr;
+		}
+		else if(i == blk_toRead - 1){ 
+			if(size_toRead - size_read > BLOCK_SIZE) return -1;
+			memcpy(aux_blk, buffer + size_read, size_toRead - size_read);
+			seek_ptr += size_toRead - size_read; 
+			size_read += size_toRead - size_read; 
+		}
+		else { 
+			memcpy(aux_blk, buffer + size_read, BLOCK_SIZE);
+			seek_ptr += BLOCK_SIZE; 
+			size_ read += BLOCK_SIZE; 
+		}
 	}
 	
 	return size_read;
