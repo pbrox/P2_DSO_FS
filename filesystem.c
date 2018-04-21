@@ -350,100 +350,81 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	//First, we have to check if the file to be written is opened or not.
 	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1;
 
-//FALTA LA PARTE DE QUE SI TE PASAS SE ESCRIBA HASTA DONDE PUEDAS: ALBA HAZ COMMIT DE READ()
+
 
 	//Now we prepare parameters in order to write in the current file pointer
 
-	int seek_ptr = file_table->file_pos[fileDescriptor];
-
 	int file_blks = numblocks(mem_inodes[fileDescriptor].size);
 
-	int current_blk = seek_ptr/BLOCK_SIZE;
-	//int offset_current_blk = seek_ptr % BLOCK_SIZE; Da de error de UNUSED, me he dejado un caso: REVISAR (quito para compilar)
-	int bytes_wr_first_bk = BLOCK_SIZE - seek_ptr;
-	int towrite_bytes = numBytes - bytes_wr_first_bk;//bytes to write in blocks that are not where fp is
-	//Le falta un +1 que le quite porque hace referencia a tener que escribir el bloque del fp y me jodia para el to_alloc
-	int towrite_blks = towrite_bytes/BLOCK_SIZE + (towrite_bytes % BLOCK_SIZE == 0)? 0 : 1 ; 
+	//Get the starting position
+	int st_bk = file_table->file_pos[fileDescriptor]/BLOCK_SIZE;
+	int offset = file_table->file_pos[fileDescriptor] % BLOCK_SIZE;
 
-	/* The difference between the file size in blocks and the blocks to be written from the
-	 file pointer will result in the number of blocks to be allocated. It will be 0 or negative
-	 if there is no need to allocate blocks*/
-	int to_alloc = (current_blk + towrite_blks) - file_blks;
-
+	int to_write, written_bytes = 0, to_copy;
+	if(file_table->file_pos[fileDescriptor] + numBytes > mem_inodes[fileDescriptor].size) to_write = mem_inodes[fileDescriptor].size - file_table->file_pos[fileDescriptor];
+	else to_write = numBytes; //Otherwise, read all the bytes
 
 	//end of parameters preparation
 
+
 	//BLOCK SERVING:
 
-	//When this counter reaches 0 we now we have to start allocating blocks
-	//If the blocks to alloc is 0 or negative, there is no need to do so
-	int alloc_counter = (to_alloc > 0 )? to_alloc : -1;
-	int written_bytes = 0;
-
+	//Read inode indirect block
 	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
-	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect, (char*)indirect) < 0) return -1;
+	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect ,(char*)indirect) < 0) return -1;
 
-	for(int i = 0; i < towrite_blks + 1; ++i)
+	//Read the first block
+	char aux_blk[BLOCK_SIZE] =  {0};
+
+	//Copy bytes to buffer and update variable
+	if(to_write + offset > BLOCK_SIZE) to_copy = BLOCK_SIZE - offset;
+	else to_copy = to_write;
+
+	int it_blk;
+	if(st_bk >= file_blks)if((it_blk = balloc()) < 0 ) return 0;
+	else 
 	{
-		char aux_blk[BLOCK_SIZE] = {0};
+		it_blk = indirect[st_bk];
+		if(bread("disk.dat", it_blk, aux_blk)< 0) return 0;
+	}
 
-		if(alloc_counter == 0)
-		{
-			int alloc_block;
-			if((alloc_block = balloc()) < 0 ) return -1;
-			//Write the block
-			memcpy(aux_blk, buffer + written_bytes, BLOCK_SIZE);
-			//Write that block back into the disk
-			written_bytes += BLOCK_SIZE;
-			if(bwrite("disk.dat", alloc_block, aux_blk) < 0) return -1;
-			//Decrease counter & update internal pointer to next position to be written
-			seek_ptr += written_bytes;
+	memcpy(aux_blk+offset, buffer, to_copy);
+	if(bwrite("disk.dat", it_blk, aux_blk) < 0) return 0;
+
+	write_bytes += to_copy;
+	to_write -= to_copy;
+
+	while( to_write > 0){
+
+		//Copy bytes to buffer and update variable
+		if(to_write  > BLOCK_SIZE) to_copy = BLOCK_SIZE;
+		else to_copy = to_write;
+
+		int it_blk;
+		if(++st_bk >= file_blks){
+			if((it_blk = balloc()) < 0 ) break;
+			bzero(aux_blk, BLOCK_SIZE);
 		}
 		else 
 		{
-		//ESTE ÚTIMO CASO SE RECONOCE CUANDO SOY EL LAST BLOCK	
-
-			/*IF NO NEED TO ALLOCATE*/
-			// primero se copia y luego se reescribe-->Para dejar el 'padding'
-			/*IF NEED TO ALLOCATE*/
-			// balloc() y escribelo
-			//Copy the current block into an auxiliary block
-
-			//ULTIMO CASO
-			if(i == towrite_blks - 2)
-			{
-				if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
-				//Write as much content of the buffer as possible in the remaining space 
-				//AQUI NO QUIERO ESCRIBIR BLK_SIZE, SINO: [#######^cacacaca000]
-				memcpy(aux_blk, buffer + written_bytes, towrite_bytes + bytes_wr_first_bk - written_bytes);//La suma podria ser numBytes
-				//Write that block back into the disk
-				if(bwrite("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
-				written_bytes += towrite_bytes + bytes_wr_first_bk - written_bytes; // se puede qutar el -written_bytes y poner = 
-				//Decrease counter & update internal pointer to next position to be written
-				seek_ptr += written_bytes;
-			}
-			else//Cualquier otro caso donde no haya que alocar
-			{
-
-				if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
-				//Write as much content of the buffer as possible in the remaining space 
-				memcpy(aux_blk, buffer + written_bytes, BLOCK_SIZE);
-				//Write that block back into the disk
-				if(bwrite("disk.dat", indirect[seek_ptr/BLOCK_SIZE], aux_blk) < 0) return -1;
-				written_bytes += BLOCK_SIZE;
-				//Decrease counter & update internal pointer to next position to be written
-				seek_ptr += written_bytes;
-				--alloc_counter;
-			}
+			it_blk = indirect[st_bk];
+			if(bread("disk.dat", it_blk, aux_blk)< 0) break;
 		}
 
+		memcpy(aux_blk, (char*)(buffer) + written_bytes, to_copy);
+		if(bwrite("disk.dat", it_blk, aux_blk) < 0) break;
+
+		write_bytes += to_copy;
+		to_write -= to_copy;
 	}
 
+	int aux_size = file_table->file_pos[fileDescriptor] + written_bytes - mem_inodes[fileDescriptor].size;
+	mem_inodes[fileDescriptor].size = (aux_size > 0)? aux_size : mem_inodes[fileDescriptor].size;
 
 
-	file_table->file_pos[fileDescriptor] = seek_ptr;
+	file_table->file_pos[fileDescriptor] += written_bytes;
 
-	return written_bytes; 
+	return written_bytes;
 }
 
 
