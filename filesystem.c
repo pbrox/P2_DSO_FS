@@ -164,7 +164,7 @@ int unmountFS(void)
 	for(int i = 0; i < mem_superblock.in_num;++i){
 		if(bitmap_getbit(file_table->is_opened, i)){
 			if(closeFile(i) < 0) return -1;
-		}
+		} 
 	}
 
 	//Writes SuperBock, no need padding because is exactly in memory 2048 bytes
@@ -280,55 +280,64 @@ int closeFile(int fileDescriptor)
 /*
  * @brief	Reads a number of bytes from a file and stores them in a buffer.
  * @return	Number of bytes properly read, -1 in case of error.
- */
+ */ 
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
-	
-	if(!bitmap_getbit(file_table->is_opened,inode_t)) return -1; //Check if file is opened
-	
-	int seek_ptr = openFile_table.file_pos[fileDescriptor]; //Get the file pointer
-	int size_toRead = 0; //Initialize size to read (bytes)
-	int blk_toRead = 0; //Initialize blocks to read (blocks)
-	int size_read = 0; //Initialize size already read (bytes)
-	
+	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
+
+	//Prepare structures for reading
 	//If size to read is greater than size of the file, just read until the end of the file
-	if(seek_ptr + numBytes > mem_inodes[fileDescriptor].size) size_toRead = mem_inodes[fileDescriptor].size - seek_ptr;
-	else size_toRead = numBytes; //Otherwise, read all the bytes
-	
-	blk_toRead = size_toRead/BLOCK_SIZE + ((seek_ptr%BLOCK_SIZE!=0)?1:0);
-	
+	int to_read, read_bytes = 0, to_copy;
+	if(file_table->file_pos[fileDescriptor] + numBytes > mem_inodes[fileDescriptor].size) to_read = mem_inodes[fileDescriptor].size - file_table->file_pos[fileDescriptor];
+	else to_read = numBytes; //Otherwise, read all the bytes
+
+	//Check if there are bytes to read
+	if(to_read == 0) return 0; //This is not strictly needed but avoids creating inecesary structures 
+
+	//Read inode indirect block
 	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
-	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect, (char*)indirect) < 0) return -1;
-	
-	for (int i = 0; i<blk_toRead; ++i){//Read all the blocks
-	
-		if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], indirect) < 0) return -1; //Read the current block
-		
-		if(blk_toRead == 1){ 
-			memcpy(aux_blk, buffer + size_read, size_toRead);
-			seek_ptr += size_toRead; 
-			size_read = size_toRead; 
-		}
-		else if(i == 0){ 
-			memcpy(aux_blk, buffer + size_read, BLOCK_SIZE - seek_ptr);
-			seek_ptr += BLOCK_SIZE - seek_ptr; 
-			size_read += BLOCK_SIZE - seek_ptr;
-		}
-		else if(i == blk_toRead - 1){ 
-			if(size_toRead - size_read > BLOCK_SIZE) return -1;
-			memcpy(aux_blk, buffer + size_read, size_toRead - size_read);
-			seek_ptr += size_toRead - size_read; 
-			size_read += size_toRead - size_read; 
-		}
-		else { 
-			memcpy(aux_blk, buffer + size_read, BLOCK_SIZE);
-			seek_ptr += BLOCK_SIZE; 
-			size_ read += BLOCK_SIZE; 
-		}
+	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect ,(char*)indirect) < 0) return -1;
+
+	//Get the starting position
+	int st_bk = file_table->file_pos[fileDescriptor]/BLOCK_SIZE;
+	int offset = file_table->file_pos[fileDescriptor] % BLOCK_SIZE;
+
+	//Read the first block
+	char aux_blk[BLOCK_SIZE] =  {0};
+	if(bread("disk.dat", indirect[st_bk], aux_blk)< 0) return 0; //0 Bytes read
+
+	//Copy bytes to buffer and update variable
+	if(to_read + offset > BLOCK_SIZE) to_copy = BLOCK_SIZE - offset;
+	else to_copy = to_read;
+
+	memcpy(buffer, (aux_blk+offset), to_copy);
+	read_bytes += to_copy;
+	to_read -= to_copy;
+
+	//Copy the rest of the blocks (if needed)
+	while(to_read > 0){
+
+		//Computing remaining bytes of THE NEXT BLOCK
+		if(to_read > BLOCK_SIZE) to_copy = BLOCK_SIZE;
+		else to_copy = to_read;
+
+		//Reading next block
+		if(bread("disk.dat", indirect[++st_bk], aux_blk) < 0) break; //Stop prepaturely the loop in case of error to update variables until this point
+
+		//Copy memory
+		memcpy(((char*)buffer + read_bytes), aux_blk, to_copy);
+
+		//Update variables
+		read_bytes += to_copy;
+		to_read -= to_copy;
+
 	}
-	
-	return size_read;
+
+	//Update seek pointer
+	file_table->file_pos[fileDescriptor] += read_bytes;
+	//Return read bytes
+	return read_bytes;
 }
 /*
  * @brief	Writes a number of bytes from a buffer and into a file.

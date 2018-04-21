@@ -8,7 +8,7 @@
 
 #include <stdlib.h>
 #include <strings.h>
-#include <string.h>
+#include <string.h> 
 #include <stdint.h>
 #define MAX_CAPACITY 10485760 // 10 MB
 #define MIN_CAPACITY 51200 // 50 KB
