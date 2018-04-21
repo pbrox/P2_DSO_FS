@@ -275,11 +275,50 @@ int closeFile(int fileDescriptor)
  * @brief	Reads a number of bytes from a file and stores them in a buffer.
  * @return	Number of bytes properly read, -1 in case of error.
  */
+/*
+ * @brief	Reads a number of bytes from a file and stores them in a buffer.
+ * @return	Number of bytes properly read, -1 in case of error.
+ */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	return -1;
+	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
+	
+	if(!bitmap_getbit(file_table->is_opened,inode_t)) return -1; //Check if file is opened
+	
+	int seek_ptr = openFile_table.file_pos[fileDescriptor]; //Get the file pointer
+	int size_toRead = 0; //Initialize size to read (bytes)
+	int blk_toRead = 0; //Initialize blocks to read (blocks)
+	int size_read = 0; //Initialize size already read (bytes)
+	
+	//If size to read is greater than size of the file, just read until the end of the file
+	if(seek_ptr + numBytes > mem_inodes[fileDescriptor].size) size_toRead = mem_inodes[fileDescriptor].size - seek_ptr;
+	else size_toRead = numBytes; //Otherwise, read all the bytes
+	
+	blk_toRead = size_toRead/BLOCK_SIZE + ((seek_ptr%BLOCK_SIZE!=0)?1:0);
+	
+	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
+	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect, (char*)indirect) < 0) return -1;
+	
+	for (int i = 0; i<blk_toRead; ++i){//Read all the blocks
+	
+		if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], buffer) < 0) return -1; //Read the current block
+		
+		switch(i){//Update seek_ptr y size_read
+			case 0:
+				seek_ptr += BLOCK_SIZE - seek_ptr;
+				size_read += BLOCK_SIZE - seek_ptr;
+			case blk_toRead - 1:
+				seek_ptr += BLOCK_SIZE - seek_ptr;
+				size_read += BLOCK_SIZE - seek_ptr;
+			default:
+				seek_ptr += BLOCK_SIZE;
+				size_ read += BLOCK_SIZE;
+		}
+		
+	}
+	
+	return size_read;
 }
-
 /*
  * @brief	Writes a number of bytes from a buffer and into a file.
  * @return	Number of bytes properly written, -1 in case of error.
