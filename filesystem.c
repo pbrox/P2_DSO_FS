@@ -303,18 +303,10 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	
 		if(bread("disk.dat", indirect[seek_ptr/BLOCK_SIZE], buffer) < 0) return -1; //Read the current block
 		
-		switch(i){//Update seek_ptr y size_read
-			case 0:
-				seek_ptr += BLOCK_SIZE - seek_ptr;
-				size_read += BLOCK_SIZE - seek_ptr;
-			case blk_toRead - 1:
-				seek_ptr += BLOCK_SIZE - seek_ptr;
-				size_read += BLOCK_SIZE - seek_ptr;
-			default:
-				seek_ptr += BLOCK_SIZE;
-				size_ read += BLOCK_SIZE;
-		}
-		
+		if(blk_toRead == 1){ seek_ptr += size_toRead; size_read = size_toRead; }
+		else if(i == 0){ seek_ptr += BLOCK_SIZE - seek_ptr; size_read += BLOCK_SIZE - seek_ptr;}
+		else if(i == blk_toRead - 1){ seek_ptr += size_toRead - size_read; size_read += size_toRead - size_read; }
+		else { seek_ptr += BLOCK_SIZE; size_ read += BLOCK_SIZE; }
 	}
 	
 	return size_read;
