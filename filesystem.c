@@ -315,7 +315,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	else to_copy = to_read;
 
 	memcpy(buffer, (aux_blk+offset), to_copy);
-	read_bytes += to_copy;
+	read_bytes += to_copy; 
 	to_read -= to_copy;
 
 	//Copy the rest of the blocks (if needed)
@@ -410,6 +410,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		int it_blk;
 		if(++st_bk >= file_blks){
 			if((it_blk = balloc()) < 0 ) break;
+			indirect[st_bk] = it_blk;
 			bzero(aux_blk, BLOCK_SIZE);
 		}
 		else 
