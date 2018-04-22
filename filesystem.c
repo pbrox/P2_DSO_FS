@@ -286,6 +286,7 @@ int closeFile(int fileDescriptor)
  */ 
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
+
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
 	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
  
@@ -353,8 +354,6 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	//First, we have to check if the file to be written is opened or not.
 	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1;
 
-
-
 	//Now we prepare parameters in order to write in the current file pointer
 
 	int file_blks = numblocks(mem_inodes[fileDescriptor].size);
@@ -402,7 +401,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	to_write -= to_copy;
 
 	while( to_write > 0){
-
+ 
 		//Copy bytes to buffer and update variable
 		if(to_write  > BLOCK_SIZE) to_copy = BLOCK_SIZE;
 		else to_copy = to_write;
@@ -412,7 +411,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 			if((it_blk = balloc()) < 0 ) break;
 			indirect[st_bk] = it_blk;
 			bzero(aux_blk, BLOCK_SIZE);
-		}
+		} 
 		else 
 		{
 			it_blk = indirect[st_bk];
@@ -427,17 +426,17 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 
 		written_bytes += to_copy;
 		to_write -= to_copy;
-	}
-
+	} 
+	printf("BUFP %d\n", file_table->file_pos[fileDescriptor]);
 	int aux_size = file_table->file_pos[fileDescriptor] + written_bytes - mem_inodes[fileDescriptor].size;
-	mem_inodes[fileDescriptor].size = (aux_size > 0)? aux_size : mem_inodes[fileDescriptor].size;
+	printf("AUX_SIZE %d\n", aux_size);
+	mem_inodes[fileDescriptor].size = (aux_size > 0)? aux_size + mem_inodes[fileDescriptor].size : mem_inodes[fileDescriptor].size;
 
 	file_table->file_pos[fileDescriptor] += written_bytes;
 	if(bwrite("disk.dat", mem_inodes[fileDescriptor].indirect ,(char*)indirect) < 0) return -1;
-
 	return written_bytes;
 }
-
+ 
 
 /*
  * @brief	Modifies the position of the seek pointer of a file.
