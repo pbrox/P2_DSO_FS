@@ -216,7 +216,7 @@ int createFile(char *fileName)
 /*
  * @brief	Deletes a file, provided it exists in the file system.
  * @return	0 if success, -1 if the file does not exist, -2 in case of error..
- */
+ */ 
 int removeFile(char *fileName)
 {	
 	int inode_t = nametoi(fileName);
@@ -288,7 +288,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
 	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
-
+ 
 	//Prepare structures for reading
 	//If size to read is greater than size of the file, just read until the end of the file
 	int to_read, read_bytes = 0, to_copy;
@@ -364,12 +364,10 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	int offset = file_table->file_pos[fileDescriptor] % BLOCK_SIZE;
 
 	int to_write, written_bytes = 0, to_copy;
-	if(file_table->file_pos[fileDescriptor] + numBytes > mem_inodes[fileDescriptor].size) to_write = mem_inodes[fileDescriptor].size - file_table->file_pos[fileDescriptor];
+	if(file_table->file_pos[fileDescriptor] + numBytes > MAX_FILE_SIZE) to_write = mem_inodes[fileDescriptor].size - file_table->file_pos[fileDescriptor];
 	else to_write = numBytes; //Otherwise, read all the bytes
 
 	//end of parameters preparation
-
- 
 	//BLOCK SERVING:
 
 	//Read inode indirect block
@@ -386,6 +384,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	int it_blk;
 	if(st_bk >= file_blks){
 		if((it_blk = balloc()) < 0 ) return 0;
+		indirect[st_bk] = it_blk;
 	}
 	else 
 	{ 
@@ -394,7 +393,10 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}
 
 	memcpy(aux_blk+offset, buffer, to_copy);
-	if(bwrite("disk.dat", it_blk, aux_blk) < 0) return 0;
+	if(bwrite("disk.dat", it_blk, aux_blk) < 0) {
+		if(it_blk >= file_blks) bfree(it_blk);
+		return 0;
+	}
 
 	written_bytes += to_copy;
 	to_write -= to_copy;
@@ -417,7 +419,10 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		}
 
 		memcpy(aux_blk, (char*)(buffer) + written_bytes, to_copy);
-		if(bwrite("disk.dat", it_blk, aux_blk) < 0) break;
+		if(bwrite("disk.dat", it_blk, aux_blk) < 0) {
+			if(it_blk >= file_blks) bfree(it_blk);
+			break;
+		}
 
 		written_bytes += to_copy;
 		to_write -= to_copy;
@@ -426,8 +431,8 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	int aux_size = file_table->file_pos[fileDescriptor] + written_bytes - mem_inodes[fileDescriptor].size;
 	mem_inodes[fileDescriptor].size = (aux_size > 0)? aux_size : mem_inodes[fileDescriptor].size;
 
-
 	file_table->file_pos[fileDescriptor] += written_bytes;
+	if(bwrite("disk.dat", mem_inodes[fileDescriptor].indirect ,(char*)indirect) < 0) return -1;
 
 	return written_bytes;
 }
@@ -436,13 +441,13 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 /*
  * @brief	Modifies the position of the seek pointer of a file.
  * @return	0 if succes, -1 otherwise.
- */
+ */ 
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
 	//Error if invalid file descriptor or the file is closed
 	if(fileDescriptor < 0 || fileDescriptor > 40 || !bitmap_getbit(file_table->is_opened,fileDescriptor) ) return -1;
 	int aux_p;
-	switch(fileDescriptor){
+	switch(whence){
 		
 		case FS_SEEK_BEGIN:
 			file_table->file_pos[fileDescriptor] = 0; //If seek beguinputs the pointer to 0 

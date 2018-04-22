@@ -35,7 +35,7 @@ int main() {
 
 	///////
 
-	ret = mountFS();
+	ret = mountFS(); 
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
@@ -51,7 +51,38 @@ int main() {
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
+	/////// 
+	ret = openFile("test.txt");
+	if(ret < 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
 	///////
+	char * to_write_bff = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi vitae porta nisi. Etiam urna enim, placerat quis tellus quis, consectetur accumsan ligula. Maecenas ultrices orci id turpis tempus fringilla. Pellentesque viverra tincidunt turpis, non consequat mi laoreet ultrices. Cras massa elit, iaculis a augue et, egestas mattis tellus. Etiam eleifend lectus eu diam iaculis, ut lobortis mi vehicula. Nam ut lacinia justo. Mauris ac massa ex. Phasellus faucibus tristique neque, vel fermentum augue dignissim eu. Integer non erat venenatis, rhoncus dui vitae, convallis neque. In egestas aliquet nisl, eu pellentesque dolor mollis vitae.\nNulla consectetur, metus ac elementum rhoncus, metus purus eleifend libero, eu iaculis enim magna id lorem. Donec eget laoreet ex. Vestibulum vitae leo magna. Pellentesque eget neque dui. Donec neque metus, blandit ut dignissim non, semper vitae libero. Aenean accumsan egestas magna. Ut a cursus metus, eget convallis ex. Mauris commodo mauris sed lorem cursus, vitae tristique metus.";
+	int bytes = writeFile(ret, to_write_bff, strlen(to_write_bff)+1);
+	printf("%d %ld\n", bytes, strlen(to_write_bff));
+
+	/////// 
+	int rit = lseekFile(ret,0,FS_SEEK_BEGIN); 
+	if(rit != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	char readBff[1030];
+	bytes = readFile(ret,readBff,1030);
+	printf("%d\n%s\n", bytes, readBff);
+
+	///////
+	int rot = closeFile(ret);
+	if(rot != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	//////
 
 	ret = unmountFS();
 	if(ret != 0) {
