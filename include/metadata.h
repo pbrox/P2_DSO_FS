@@ -27,7 +27,7 @@ typedef struct {
 
 } inode; //4+4+4+32 = 44 bytes
 
-typedef struct {
+typedef struct { 
 	
 	uint32_t magicNum; 
 	uint32_t bk_num; //Number of blocks

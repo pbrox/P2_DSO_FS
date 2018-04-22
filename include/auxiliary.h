@@ -29,3 +29,6 @@ int numblocks(int size);
 //Computes the 32 CRC of the blocks which blk_id is inside of bk_array, if error checked in err
 //-1 -> Error
 uint32_t blk_32CRC(int * bk_array, int n_blk, int *err);
+
+//Computes the 32 CRC off all indirect allocated blocks of the file system, not need of mounted
+uint32_t ind_32CRC(char * inodes_map, char use_disk, int * err);
