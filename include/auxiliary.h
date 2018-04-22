@@ -6,6 +6,8 @@
  * @date	01/03/2017
  */
 
+#include <stdint.h>
+
 //Allocates an inode, sets it to 0
 int ialloc();
 
@@ -23,3 +25,7 @@ int nametoi(char * name);
 
 //Return the number of blocks needed to fit the given size
 int numblocks(int size);
+
+//Computes the 32 CRC of the blocks which blk_id is inside of bk_array, if error checked in err
+//-1 -> Error
+uint32_t blk_32CRC(int * bk_array, int n_blk, int *err);

@@ -85,6 +85,28 @@ int numblocks(int size){
 	//It is the number of blocks that are totally used and 1 more if there's still size to put
 }
 
+//Computes the 32 CRC of the blocks which blk_id is inside of bk_array
+uint32_t blk_32CRC(int * bk_array, int n_blk, int * err){
+
+	//To store the results
+	uint32_t prev = 0, current;
+	char aux_blk[BLOCK_SIZE];
+
+	//Computing the crc
+	for(int i = 0; i < n_blk; ++i){
+
+		if(bread("disk.dat", bk_array[i] ,aux_blk) < 0){
+			*err = -1;
+			return 0;
+		}
+
+		current = CRC32((const unsigned char*)aux_blk, BLOCK_SIZE, prev);
+		prev = current;
+	}
+
+	*err = 0;
+	return current;
+}
 
 /* 
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -482,5 +504,22 @@ int checkFS(void)
  */
 int checkFile(char *fileName)
 {
-	return -2;
+	int inode_id = nametoi(fileName);
+	if(inode_id < 0 || bitmap_getbit(file_table->is_opened, inode_id)) return -2; //If it does not exist or it is opened, return error
+
+	//Read indirect from inode
+	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
+	if(bread("disk.dat", mem_inodes[inode_id].indirect,(char*)indirect) < 0) return -2; //Return error if indirect block cannot be read
+
+	//compute crc of blocks
+	int err;
+	uint32_t b_crc = blk_32CRC(indirect, numblocks(mem_inodes[inode_id].size), &err);
+	if(err < 0) return -2; //Return error computing CRC
+
+	//Add the indirect block to the crc
+	uint32_t crc = CRC32((const unsigned char *)indirect, BLOCK_SIZE, b_crc);
+
+	//Comparing CRC
+	if(crc == mem_inodes[inode_id].crc) return 0; //File not corrupted
+	else return -1; //File corrupted
 }
