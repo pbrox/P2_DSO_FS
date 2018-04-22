@@ -274,7 +274,7 @@ int closeFile(int fileDescriptor)
 	bitmap_setbit(file_table->is_opened,fileDescriptor,0); //Set the file as closed
 	//No need to put the pointer to 0 because it is initializated as 0
 	return 0;
-}
+} 
 
 /*
  * @brief	Reads a number of bytes from a file and stores them in a buffer.
@@ -427,9 +427,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		written_bytes += to_copy;
 		to_write -= to_copy;
 	} 
-	printf("BUFP %d\n", file_table->file_pos[fileDescriptor]);
 	int aux_size = file_table->file_pos[fileDescriptor] + written_bytes - mem_inodes[fileDescriptor].size;
-	printf("AUX_SIZE %d\n", aux_size);
 	mem_inodes[fileDescriptor].size = (aux_size > 0)? aux_size + mem_inodes[fileDescriptor].size : mem_inodes[fileDescriptor].size;
 
 	file_table->file_pos[fileDescriptor] += written_bytes;
