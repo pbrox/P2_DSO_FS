@@ -381,9 +381,11 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	else to_copy = to_write;
 
 	int it_blk;
-	if(st_bk >= file_blks)if((it_blk = balloc()) < 0 ) return 0;
+	if(st_bk >= file_blks){
+		if((it_blk = balloc()) < 0 ) return 0;
+	}
 	else 
-	{
+	{ 
 		it_blk = indirect[st_bk];
 		if(bread("disk.dat", it_blk, aux_blk)< 0) return 0;
 	}
@@ -391,7 +393,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	memcpy(aux_blk+offset, buffer, to_copy);
 	if(bwrite("disk.dat", it_blk, aux_blk) < 0) return 0;
 
-	write_bytes += to_copy;
+	written_bytes += to_copy;
 	to_write -= to_copy;
 
 	while( to_write > 0){
@@ -414,7 +416,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		memcpy(aux_blk, (char*)(buffer) + written_bytes, to_copy);
 		if(bwrite("disk.dat", it_blk, aux_blk) < 0) break;
 
-		write_bytes += to_copy;
+		written_bytes += to_copy;
 		to_write -= to_copy;
 	}
 
@@ -436,19 +438,19 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 {
 	//Error if invalid file descriptor or the file is closed
 	if(fileDescriptor < 0 || fileDescriptor > 40 || !bitmap_getbit(file_table->is_opened,fileDescriptor) ) return -1;
-
+	int aux_p;
 	switch(fileDescriptor){
 		
 		case FS_SEEK_BEGIN:
-			file_table.file_pos[fileDescriptor] = 0; //If seek beguinputs the pointer to 0 
+			file_table->file_pos[fileDescriptor] = 0; //If seek beguinputs the pointer to 0 
 			break;
 		case FS_SEEK_END:
-			file_table.file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size; //If seek to end, sets at the size of the file (which in fact is the place to write
+			file_table->file_pos[fileDescriptor] = mem_inodes[fileDescriptor].size; //If seek to end, sets at the size of the file (which in fact is the place to write
 			break;
-		case FS_SEEK_CUR:
-			int aux_p = file_table.file_pos[fileDescriptor] + offset; //Gets the new pointer
+		case FS_SEEK_CUR: 
+			aux_p = file_table->file_pos[fileDescriptor] + offset; //Gets the new pointer
 			if(aux_p < 0 || aux_p > mem_inodes[fileDescriptor].size) return -1; //If the position is not valid returns error
-			file_table.file_pos[fileDescriptor] = aux_p; //Sets the pointer
+			file_table->file_pos[fileDescriptor] = aux_p; //Sets the pointer
 			break;
 		default:
 			return -1; //if option is not correct return error
