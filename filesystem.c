@@ -50,9 +50,12 @@ int balloc(){
 
 int nametoi(char * name){
 
+	//As strncmp will not check it we have to check this before 
+	if(strlen(name) > MAX_NAME) return -1;
+
 	for(int i = 0; i < mem_superblock.in_num; ++i){ //For each inode allocated we see if the name is the same
 		//If the inode exists and the name is the same, returns the index (the inode number)
-		if(bitmap_getbit(mem_superblock.in_map, i) && strcmp(name, mem_inodes[i].name) == 0) return i;
+		if(bitmap_getbit(mem_superblock.in_map, i) && strncmp(mem_inodes[i].name, name , MAX_NAME) == 0) return i;
 	}
 
 	return -1; //If no inode is found returns error 
@@ -188,7 +191,7 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	if(strlen(fileName)>31) return -2; //If the file_name is bigger than 32 CHECKK!
+	if(strlen(fileName)>MAX_NAME) return -2; //If the file_name is bigger than 32 
 	//Checks uniqueness
 	if(nametoi(fileName) != -1) return -1; //The file already exist if nametoi finds it, if it returns error the file didn't exist
 	int inode_id, indirect_id;
@@ -206,7 +209,7 @@ int createFile(char *fileName)
 	//mem_inodes[inode_id].size = 0;
 	mem_inodes[inode_id].indirect = indirect_id; //The block is set to 0
 	//The indirect occupied blocks is not needed because it can be computed
-	strcpy(mem_inodes[inode_id].name, fileName);
+	strncpy(mem_inodes[inode_id].name, fileName, MAX_NAME);
 	return 0;
 }
 
@@ -366,7 +369,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 
 	//end of parameters preparation
 
-
+ 
 	//BLOCK SERVING:
 
 	//Read inode indirect block

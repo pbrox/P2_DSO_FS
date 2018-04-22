@@ -14,6 +14,7 @@
 #define MIN_CAPACITY 51200 // 50 KB
 #define MAGIC_NUM 1 // 50 KB
 #define NUM_INODES 40 // 50 KB
+#define MAX_NAME 32
 
 
 //Notes in design the number of occupied bloks is size/sizeofblock + (size % sizeofblock != 0);
