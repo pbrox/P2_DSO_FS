@@ -171,6 +171,8 @@ int mountFS(void)
 	//Allocates memory for the file table, sets its to 0 (calloc call)
 	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
 	if(!file_table) return -1;
+	
+	mounted = true;
 
 	return 0;
 
@@ -204,6 +206,8 @@ int unmountFS(void)
 	//Free used memory
 	free(mem_inodes);
 	free(file_table);
+	
+	mounted = false;
 
 	return 0;
 }
@@ -214,6 +218,8 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
+	if(!mounted) return -1;
+	
 	if(strlen(fileName)>MAX_NAME) return -2; //If the file_name is bigger than 32 
 	//Checks uniqueness
 	if(nametoi(fileName) != -1) return -1; //The file already exist if nametoi finds it, if it returns error the file didn't exist
@@ -242,6 +248,8 @@ int createFile(char *fileName)
  */ 
 int removeFile(char *fileName)
 {	
+	if(!mounted) return -1;
+	
 	int inode_t = nametoi(fileName);
 	if(inode_t < 0) return -1; //The file does not exist, return error
 
@@ -272,7 +280,9 @@ int removeFile(char *fileName)
  * @return	The file descriptor if possible, -1 if file does not exist, -2 in case of error..
  */
 int openFile(char *fileName)
-{	
+{
+	if(!mounted) return -1;
+	
 	int inode_p = nametoi(fileName);//Gets the inode associated to that name
 	
 	if(inode_p < 0) return -1; //The file does not exist
@@ -289,7 +299,9 @@ int openFile(char *fileName)
  * @return	0 if success, -1 otherwise.
  */
 int closeFile(int fileDescriptor)
-{	
+{
+	if(!mounted) return -1;
+	
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
 	//Duda con esto
 	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1; //The file is already closed
@@ -308,7 +320,8 @@ int closeFile(int fileDescriptor)
  */ 
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-
+	if(!mounted) return -1;
+	
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
 	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
 
@@ -374,6 +387,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
+	if(!mounted) return -1;
 	//Check file descriptor 
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
 	//First, we have to check if the file to be written is opened or not.
@@ -470,6 +484,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */ 
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
+	if(!mounted) return -1;
 	//Error if invalid file descriptor or the file is closed
 	if(fileDescriptor < 0 || fileDescriptor > 40 || !bitmap_getbit(file_table->is_opened,fileDescriptor) ) return -1;
 	int aux_p;
@@ -510,6 +525,8 @@ int checkFS(void)
  */
 int checkFile(char *fileName)
 {
+	if(!mounted) return -1;
+	
 	int inode_id = nametoi(fileName);
 	if(inode_id < 0 || bitmap_getbit(file_table->is_opened, inode_id)) return -2; //If it does not exist or it is opened, return error
 
