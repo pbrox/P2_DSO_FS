@@ -557,7 +557,7 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int checkFile(char *fileName) 
 {
-	if(!is_mounted) return -1;
+	if(!is_mounted) return -2;
 	int inode_id = nametoi(fileName);
 	if(inode_id < 0 || bitmap_getbit(file_table->is_opened, inode_id)) return -2; //If it does not exist or it is opened, return error
 
