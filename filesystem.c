@@ -14,8 +14,8 @@
 #include "include/metadata.h"		// Type and structure declaration of the file system
 #include "include/crc.h"			// Headers for the CRC functionality
 
-
-int ialloc(){
+//Alocates an inode
+int ialloc(){ 
 
 	for(int i = 0; i < mem_superblock.in_num; ++i){
 
@@ -34,7 +34,7 @@ int balloc(){
 
 	char blank[BLOCK_SIZE] = {0}; //to 0 by default
 
-	for(int i = 0; i < mem_superblock.bk_num; ++i){
+	for(int i = 0; i < mem_superblock.bk_num; ++i){//Check al the blocks
 
 		if(!bitmap_getbit(mem_superblock.bk_map, i)) { //The block is free
 
@@ -45,9 +45,9 @@ int balloc(){
 		}
 	}
 
-	return -1;
-}
-
+	return -1; //Cannot find a free block
+} 
+ 
 int nametoi(char * name){
 
 	//As strncmp will not check it we have to check this before 
@@ -85,62 +85,31 @@ int numblocks(int size){
 	//It is the number of blocks that are totally used and 1 more if there's still size to put
 }
 
-//Computes the 32 CRC of the blocks which blk_id is inside of bk_array
+//Computes the 32 CRC of the blocks which blk_id is inside of bk_array and bk array
 uint32_t blk_32CRC(int * bk_array, int n_blk, int * err){
 
 	//To store the results
-	uint32_t prev = 0, current;
+	uint32_t current;
+	char aux_blks[(n_blk+1)*BLOCK_SIZE];
 	char aux_blk[BLOCK_SIZE];
 
-	//Computing the crc
-	for(int i = 0; i < n_blk; ++i){
+	//getting blocks
+	for(int i = 0; i < n_blk; ++i){  
 
 		if(bread("disk.dat", bk_array[i] ,aux_blk) < 0){
 			*err = -1;
 			return 0;
-		}
+		} 
 
-		current = CRC32((const unsigned char*)aux_blk, BLOCK_SIZE, prev);
-		prev = current;
+		memcpy(aux_blks+(i*BLOCK_SIZE), aux_blk, BLOCK_SIZE);
+
 	}
+	//Adding indirect
+	memcpy(aux_blks+(n_blk*BLOCK_SIZE), (char*)bk_array, BLOCK_SIZE);
 
-	*err = 0;
-	return current;
-}
-
-//Computes the 32 CRC off all indirect allocated blocks of the file system
-uint32_t ind_32CRC(char * inodes_map, char use_disk, int * err){
-
-	uint32_t prev = 0, current = 0;
-	char aux_blk[BLOCK_SIZE];
-	inode * used_inodes;
-
-	//Set if the inodes must be read from disk or used the current in memory (in case mounted)
-	if(use_disk) used_inodes = mem_inodes;
-	else{
-		used_inodes = (inode*)calloc(NUM_INODES, sizeof(inode));
-		if(bread("disk.dat", 1, aux_blk) < 0){
-			free(used_inodes);
-			*err = -1;
-			return 0;
-		}
-		memcpy(used_inodes, aux_blk, NUM_INODES*sizeof(inode));
-	}
-
-	for(int i =0; i < NUM_INODES; ++i){
-		if(bitmap_getbit(inodes_map,i)){
-			if(bread("disk.dat", used_inodes[i].indirect, aux_blk) < 0){
-				*err = -1;
-				if(!use_disk) free(used_inodes);
-				return 0;
-			}
-			current = CRC32((const unsigned char*)aux_blk, BLOCK_SIZE, prev);
-			prev = current;
-		}
-	}
-
-	*err = 0;
-	if(!use_disk) free(used_inodes);
+	//Computing CRC
+ 	current = CRC32((const unsigned char*)aux_blks, BLOCK_SIZE*n_blk, 0);
+	*err = 0; 
 	return current;
 }
 
@@ -150,8 +119,8 @@ uint32_t ind_32CRC(char * inodes_map, char use_disk, int * err){
  */
 int mkFS(long deviceSize) 
 {	
-	//Falta corregir errores
-	//Falta el  CRC
+	//If it is  mounted  or the capacity is out the limits fails
+	if(is_mounted) return 0;
 
 	if(deviceSize > MAX_CAPACITY || deviceSize < MIN_CAPACITY) return -1;
 
@@ -159,7 +128,6 @@ int mkFS(long deviceSize)
 
 	mem_superblock.magicNum = MAGIC_NUM;  //Setting magic number
 	mem_superblock.bk_num = deviceSize/BLOCK_SIZE; //Setting the numBlocks
-	mem_superblock.crc = 0; //To compute uses 0
 	mem_superblock.in_num = NUM_INODES; //Setting the inodes
 	mem_superblock.in_size = sizeof(inode);//setting the inode size
 	//Regarding the blockmap and inmap, it is initiallized automaticaly to 0 as it is global
@@ -167,21 +135,16 @@ int mkFS(long deviceSize)
 	bitmap_setbit(mem_superblock.bk_map,  1, 1);
 	//Padding is also automaticaly initiaized to 0's
 
-	//Inodes crc 
 	char aux_blank_inodes[BLOCK_SIZE] = {0}; 
-	uint32_t aux_crc = CRC32((const unsigned char *)aux_blank_inodes, BLOCK_SIZE, 0); //Uses 0 because there aren't any inode yet
-
-	//supeBlock CRC
-	mem_superblock.crc = CRC32((const unsigned char *)&mem_superblock, BLOCK_SIZE, aux_crc);
 	
 	//Writes SuperBock, no need padding because is exactly in memory 2048 bytes
 	if(bwrite("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
 
 	//Inodes Part, write a 0's block, no inode is created
 	if(bwrite("disk.dat", 1, aux_blank_inodes) < 0) return -1; //Write the whole block as 0's
-
+ 
 	return 0;
-
+  
 }
 
 /*
@@ -190,17 +153,10 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {	
+	//If it is already mounted error
+	if(is_mounted) return -1;
 
-	int check = checkFS();
-	if(check == -1){
-		printf("[FATAL ERROR] The filesystem is corrupted. Mounting Aborted.\n");
-		return -1;
-	}
-	if(check == -2){
-		printf("[ERROR] Cannot check the integrity of your filesystem. Try again\n");
-		return -1;
-	}
-	//Gets the superblock
+	//Reads the superblock
 	if(bread("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
 
 	//Check magic number
@@ -208,6 +164,8 @@ int mountFS(void)
 
 	//Checks the number of inodes and alocates its memory
 	if(mem_superblock.in_num != NUM_INODES) return -1;
+	
+	
 	char raw[BLOCK_SIZE];
 	//Gets inodes
 	if(bread("disk.dat", 1, raw) < 0) return -1;
@@ -222,6 +180,7 @@ int mountFS(void)
 	//Allocates memory for the file table, sets its to 0 (calloc call)
 	file_table = (openFile_table*)calloc(1,sizeof(openFile_table));
 	if(!file_table) return -1;
+	is_mounted = 1;
 
 	return 0;
 
@@ -234,37 +193,19 @@ int mountFS(void)
 int unmountFS(void)
 {
 	//Writes superbock and inode block
-	//Computes the CRC -- TO_DO
 	//Write the two metadata bocks of the fiesystem
-
-	//Checks open files and closes opened ones //DUDA QUITAR?
+	//Error if the file is already mounted
+	if(!is_mounted) return -1;
+	//Checks open files and closes opened ones
 	for(int i = 0; i < mem_superblock.in_num;++i){
 		if(bitmap_getbit(file_table->is_opened, i)){
 			if(closeFile(i) < 0) return -1;
 		} 
 	}
 
-	//Computing new CRC
-	int err;
-
-	//Computing indirect CRC
-	uint32_t first_crc = ind_32CRC(mem_superblock.in_map, 1, &err);
-	if(err < 0) return -1;
-
-	//Adding the inodes bk CRC
-
 	//Compute inodes block
 	char aux_blk[BLOCK_SIZE] = {0}; //Implicity to 0's
 	memcpy(aux_blk, mem_inodes, NUM_INODES*sizeof(inode)); //Writes exisixting inodes
-	uint32_t aux_crc = CRC32((const unsigned char*) aux_blk, BLOCK_SIZE, first_crc);
-
-	//computes last CRC
-
-	//Sets the actual to 0
-	mem_superblock.crc = 0;
-
-	//Computes and updates CRC
-	mem_superblock.crc = CRC32((const unsigned char *)&mem_superblock, BLOCK_SIZE, aux_crc);
 
 	//Writes SuperBock, no need padding because is exactly in memory 2048 bytes
 	if(bwrite("disk.dat", 0, (char*)&mem_superblock) < 0) return -1;
@@ -275,6 +216,7 @@ int unmountFS(void)
 	//Free used memory
 	free(mem_inodes);
 	free(file_table);
+	is_mounted = 0;
 
 	return 0;
 }
@@ -284,7 +226,9 @@ int unmountFS(void)
  * @return	0 if success, -1 if the file already exists, -2 in case of error.
  */
 int createFile(char *fileName)
-{
+{	
+	//If aready mounted returns error
+	if(!is_mounted) return -1;
 	if(strlen(fileName)>MAX_NAME) return -2; //If the file_name is bigger than 32 
 	//Checks uniqueness
 	if(nametoi(fileName) != -1) return -1; //The file already exist if nametoi finds it, if it returns error the file didn't exist
@@ -299,12 +243,11 @@ int createFile(char *fileName)
 
 	//Fills the inode CRC
 	//As it is new it does not have a CRC associated to each block, balloc has set blocks to 0 before opening, so CRC can be computed with a blank block
-	char aux_to_CRC[BLOCK_SIZE] = {0};
-	mem_inodes[inode_id].crc = CRC32((const unsigned char *)aux_to_CRC, BLOCK_SIZE, 0);
-
-	//mem_inodes[inode_id].crc = ...;
-	//I think ialloc sets to 0 check
-	//mem_inodes[inode_id].size = 0;
+	int indirect_b[BLOCK_SIZE/sizeof(uint32_t)];
+	int err;
+	if(bread("disk.dat", indirect_id, (char*)indirect_b) < 0 )return -1;
+	mem_inodes[inode_id].crc = blk_32CRC(indirect_b,0,&err);
+	if(err < 0) return -1;
 	mem_inodes[inode_id].indirect = indirect_id; //The block is set to 0
 	//The indirect occupied blocks is not needed because it can be computed
 	strncpy(mem_inodes[inode_id].name, fileName, MAX_NAME);
@@ -317,6 +260,8 @@ int createFile(char *fileName)
  */ 
 int removeFile(char *fileName)
 {	
+	//If the file system is not mounted error
+	if(!is_mounted) return -1;
 	int inode_t = nametoi(fileName);
 	if(inode_t < 0) return -1; //The file does not exist, return error
 
@@ -332,13 +277,12 @@ int removeFile(char *fileName)
 
 	//Frees all the blocks
 	for(int i = 0; i < num_blk; ++i) if(bfree(indirect[i]) < 0) return -1; //If any error return it
-		//Behaviour to DEFINEE!
 
 	//Frees indirect block
 	if(bfree( mem_inodes[inode_t].indirect) < 0) return -1; //Same as above
 
-	//Frees inode
-	if(ifree(inode_t) < 0) return -1; //Undefined also
+	//Frees inodes
+	if(ifree(inode_t) < 0) return -1; 
 
 	return 0;
 }
@@ -349,6 +293,13 @@ int removeFile(char *fileName)
  */
 int openFile(char *fileName)
 {	
+	//If the file is not mounted return error
+	if(!is_mounted) return -1;
+	int inode_p = nametoi(fileName);//Gets the inode associated to that name
+	
+	if(inode_p < 0) return -1; //The file does not exist
+
+	//Checks the integrity of the file
 	int check = checkFile(fileName);
 	if(check == -1){
 		printf("[ERROR] The file you're trying to open is corrupted. Aborting.\n");
@@ -359,14 +310,12 @@ int openFile(char *fileName)
 		return -2;
 	}
 
-	int inode_p = nametoi(fileName);//Gets the inode associated to that name
-	
-	if(inode_p < 0) return -1; //The file does not exist
 	//Searchs the file inside allocated inodes
 	if(bitmap_getbit(file_table->is_opened, inode_p)) return -2; //The file is already opened
 	bitmap_setbit(file_table->is_opened,inode_p,1); //Set the file as opened
 	file_table->file_pos[inode_p] = 0; //Sets the file pointer to 0
 	
+	//Returns the file descriptor
 	return inode_p;
 }
 
@@ -376,18 +325,20 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {	
+	//If the system is not mounted error
+	if(!is_mounted) return -1;
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
-	//Duda con esto
 	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1; //The file is already closed
 	//No need to put the pointer to 0 because it is initializated as 0
 	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
+	//Getting the indirect block
 	if(bread("disk.dat", mem_inodes[fileDescriptor].indirect, (char*) indirect) < 0) return -1;
 	int err;
-	uint32_t aux_crc = blk_32CRC(indirect, numblocks(mem_inodes[fileDescriptor].size), &err);
+	//Updating CRC
+	uint32_t _crc = blk_32CRC(indirect, numblocks(mem_inodes[fileDescriptor].size), &err);
 	if(err < 0) return -1;
-	uint32_t last_crc = CRC32((const unsigned char *)indirect, BLOCK_SIZE, aux_crc);
-
-	mem_inodes[fileDescriptor].crc = last_crc;
+	
+	mem_inodes[fileDescriptor].crc = _crc;
 
 	bitmap_setbit(file_table->is_opened,fileDescriptor,0); //Set the file as closed 
 	return 0;
@@ -403,7 +354,7 @@ int closeFile(int fileDescriptor)
  */ 
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-
+	if(!is_mounted) return -1; //If not mounted error
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
 	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
  
@@ -465,7 +416,8 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  * @return	Number of bytes properly written, -1 in case of error.
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
-{
+{	
+	if(!is_mounted) return -1; //If not mounted error
 	//Check file descriptor 
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1;
 	//First, we have to check if the file to be written is opened or not.
@@ -484,7 +436,6 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	else to_write = numBytes; //Otherwise, read all the bytes
 
 	//end of parameters preparation
-	//BLOCK SERVING:
 
 	//Read inode indirect block
 	int indirect[BLOCK_SIZE/sizeof(uint32_t)];
@@ -497,26 +448,29 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	if(to_write + offset > BLOCK_SIZE) to_copy = BLOCK_SIZE - offset;
 	else to_copy = to_write;
 
+	//Gets the iteration block
 	int it_blk;
-	if(st_bk >= file_blks){
+	if(st_bk >= file_blks){ //If need allocation it does it
 		if((it_blk = balloc()) < 0 ) return 0;
 		indirect[st_bk] = it_blk;
 	}
 	else 
 	{ 
-		it_blk = indirect[st_bk];
+		it_blk = indirect[st_bk]; //If it exists it reads it to write above
 		if(bread("disk.dat", it_blk, aux_blk)< 0) return 0;
 	}
 
+	//Copies the number ob bytes to the block and writes it
 	memcpy(aux_blk+offset, buffer, to_copy);
 	if(bwrite("disk.dat", it_blk, aux_blk) < 0) {
 		if(it_blk >= file_blks) bfree(it_blk);
 		return 0;
 	}
-
+	//Updates variables
 	written_bytes += to_copy;
 	to_write -= to_copy;
 
+	//If need to write more
 	while( to_write > 0){
  
 		//Copy bytes to buffer and update variable
@@ -524,7 +478,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		else to_copy = to_write;
 
 		int it_blk;
-		if(++st_bk >= file_blks){
+		if(++st_bk >= file_blks){ //Check if the block exists, if no allocate, else read the block
 			if((it_blk = balloc()) < 0 ) break;
 			indirect[st_bk] = it_blk;
 			bzero(aux_blk, BLOCK_SIZE);
@@ -533,17 +487,20 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		{
 			it_blk = indirect[st_bk];
 			if(bread("disk.dat", it_blk, aux_blk)< 0) break;
-		}
+		} 
 
+		//Copy the bytes to the block
 		memcpy(aux_blk, (char*)(buffer) + written_bytes, to_copy);
 		if(bwrite("disk.dat", it_blk, aux_blk) < 0) {
 			if(it_blk >= file_blks) bfree(it_blk);
 			break;
 		}
-
+		//Update variables
 		written_bytes += to_copy;
 		to_write -= to_copy;
 	} 
+
+	//Compute new metadata and writes the new indirect block
 	int aux_size = file_table->file_pos[fileDescriptor] + written_bytes - mem_inodes[fileDescriptor].size;
 	mem_inodes[fileDescriptor].size = (aux_size > 0)? aux_size + mem_inodes[fileDescriptor].size : mem_inodes[fileDescriptor].size;
 
@@ -551,14 +508,15 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	if(bwrite("disk.dat", mem_inodes[fileDescriptor].indirect ,(char*)indirect) < 0) return -1;
 	return written_bytes;
 }
- 
+  
 
 /*
  * @brief	Modifies the position of the seek pointer of a file.
  * @return	0 if succes, -1 otherwise.
  */ 
 int lseekFile(int fileDescriptor, long offset, int whence)
-{
+{	
+	if(!is_mounted) return -1;
 	//Error if invalid file descriptor or the file is closed
 	if(fileDescriptor < 0 || fileDescriptor > 40 || !bitmap_getbit(file_table->is_opened,fileDescriptor) ) return -1;
 	int aux_p;
@@ -583,45 +541,15 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 	return 0; //Return success
 
 }
-
-/*
- * @brief 	Verifies the integrity of the file system metadata.
- * @return 	0 if the file system is correct, -1 if the file system is corrupted, -2 in case of error.
- */
-int checkFS(void)
-{
-	int err;
-	//This CRC is made joining all the inodes indirect CRC + indirect blk CRC + superblock CRC
-	superblock read;
-	if(bread("disk.dat", 0, (char*)&read) < 0) return -2;
-
-	//Inodes CRC
-	uint32_t indi_inodes = ind_32CRC(read.in_map,0,&err);
-	if(err < 0) return -2;
-
-	//Adding the inodesBk CRC
-	char aux_blk[BLOCK_SIZE];
-	if(bread("disk.dat",1,aux_blk) < 0) return -2;
-	uint32_t part_crc = CRC32((const unsigned char *)aux_blk, BLOCK_SIZE, indi_inodes);
-
-	//Adding the superblock part
-	
-	uint32_t old_crc = read.crc;
-	read.crc = 0; //To avoid using the CRC in the calculations
-
-	uint32_t last_crc =CRC32((const unsigned char*)&read, BLOCK_SIZE, part_crc);
-
-	if(last_crc == old_crc) return 0;
-	else return -1;
-
-}
-
+ 
+ 
 /*
  * @brief 	Verifies the integrity of a file.
  * @return 	0 if the file is correct, -1 if the file is corrupted, -2 in case of error.
  */
 int checkFile(char *fileName) 
 {
+	if(!is_mounted) return -1;
 	int inode_id = nametoi(fileName);
 	if(inode_id < 0 || bitmap_getbit(file_table->is_opened, inode_id)) return -2; //If it does not exist or it is opened, return error
 
@@ -634,11 +562,8 @@ int checkFile(char *fileName)
 	uint32_t b_crc = blk_32CRC(indirect, numblocks(mem_inodes[inode_id].size), &err);
 	if(err < 0) return -2; //Return error computing CRC
 
-	//Add the indirect block to the crc
-	uint32_t crc = CRC32((const unsigned char *)indirect, BLOCK_SIZE, b_crc);
-
 	//Comparing CRC
-	if(crc == mem_inodes[inode_id].crc) return 0; //File not corrupted
+	if(b_crc == mem_inodes[inode_id].crc) return 0; //File not corrupted
 	else return -1; //File corrupted
 }
 
