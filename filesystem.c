@@ -93,7 +93,7 @@ uint32_t blk_32CRC(int * bk_array, int n_blk, int * err){
 	uint32_t current;
 	char aux_blks[(n_blk+1)*BLOCK_SIZE];
 	char aux_blk[BLOCK_SIZE];
-
+ 
 	//getting blocks
 	for(int i = 0; i < n_blk; ++i){  
 
@@ -355,8 +355,8 @@ int closeFile(int fileDescriptor)
  */ 
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	if(!is_mounted) return -1; //If not mounted error
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
+	if(!is_mounted) return -1; //If not mounted error
 	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
 
 	if(numBytes < 0) return -1;//Check valid number of bytes
