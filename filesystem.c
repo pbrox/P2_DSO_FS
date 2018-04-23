@@ -34,7 +34,8 @@ int balloc(){
 
 	char blank[BLOCK_SIZE] = {0}; //to 0 by default
 
-	for(int i = 0; i < mem_superblock.bk_num; ++i){//Check al the blocks
+
+	for(int i = 2; i < mem_superblock.bk_num; ++i){
 
 		if(!bitmap_getbit(mem_superblock.bk_map, i)) { //The block is free
 
@@ -142,7 +143,7 @@ int mkFS(long deviceSize)
 
 	//Inodes Part, write a 0's block, no inode is created
 	if(bwrite("disk.dat", 1, aux_blank_inodes) < 0) return -1; //Write the whole block as 0's
- 
+
 	return 0;
   
 }
@@ -238,7 +239,7 @@ int createFile(char *fileName)
 	//Allocates the indirect block
 	if((indirect_id = balloc()) < 0 ){ //If cannot find a block
 		ifree(inode_id); //Frees the allocated inode
-		return -1;
+		return -2;
 	}
 
 	//Fills the inode CRC
@@ -276,13 +277,13 @@ int removeFile(char *fileName)
 	if(bread("disk.dat", mem_inodes[inode_t].indirect, (char*)indirect) < 0) return -2;
 
 	//Frees all the blocks
-	for(int i = 0; i < num_blk; ++i) if(bfree(indirect[i]) < 0) return -1; //If any error return it
+	for(int i = 0; i < num_blk; ++i) if(bfree(indirect[i]) < 0) return -2; //If any error return it
 
 	//Frees indirect block
-	if(bfree( mem_inodes[inode_t].indirect) < 0) return -1; //Same as above
+	if(bfree( mem_inodes[inode_t].indirect) < 0) return -2; //Same as above
 
-	//Frees inodes
-	if(ifree(inode_t) < 0) return -1; 
+	//Frees inode
+	if(ifree(inode_t) < 0) return -2;
 
 	return 0;
 }
@@ -357,6 +358,9 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	if(!is_mounted) return -1; //If not mounted error
 	if(fileDescriptor < 0 || fileDescriptor > 40) return -1; //Check if fileDescriptor is valid
 	if(!bitmap_getbit(file_table->is_opened,fileDescriptor)) return -1; //Check if file is opened
+
+	if(numBytes < 0) return -1;//Check valid number of bytes
+
  
 	//Prepare structures for reading
 	//If size to read is greater than size of the file, just read until the end of the file
@@ -423,6 +427,8 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	//First, we have to check if the file to be written is opened or not.
 	if(!bitmap_getbit(file_table->is_opened, fileDescriptor)) return -1;
 
+	if(numBytes < 0) return -1;//Check valid number of bytes
+
 	//Now we prepare parameters in order to write in the current file pointer
 
 	int file_blks = numblocks(mem_inodes[fileDescriptor].size);
@@ -434,6 +440,8 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	int to_write, written_bytes = 0, to_copy;
 	if(file_table->file_pos[fileDescriptor] + numBytes > MAX_FILE_SIZE) to_write = mem_inodes[fileDescriptor].size - file_table->file_pos[fileDescriptor];
 	else to_write = numBytes; //Otherwise, read all the bytes
+
+	if(to_write == 0) return 0;
 
 	//end of parameters preparation
 
