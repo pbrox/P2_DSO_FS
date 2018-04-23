@@ -24,24 +24,8 @@
 int main() {
 	int ret;
 	
-	//CREATING A DISK OF 25 BLOCKS
-	
-	//Bigger FS than allowed
-	ret = mkFS(51199);
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS 01", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS 01", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	
-	//Lower FS than allowed
-	ret = mkFS(10485761);
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS 02", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS 02", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	
-	//Create disk of maximum size
-	ret = mkFS(1054720);
+	//Create disk
+	ret = mkFS(DEV_SIZE);
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS 02", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 	}
@@ -252,7 +236,7 @@ int main() {
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile 05", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	
 	//Non-existing whence
-	ret = lseek(0, 0, HOLA);
+	ret = lseek(0, 0, 355);
 	if(ret != 1) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lseek 01", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 	}
