@@ -26,15 +26,15 @@ int main() {
 
 	///////
 
-	ret = mkFS(DEV_SIZE);
+	/*ret = mkFS(DEV_SIZE);
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);*/
 
-	///////
-
+	///////*/
+ 
 	ret = mountFS(); 
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -42,14 +42,14 @@ int main() {
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-	///////
 
-	ret = createFile("test.txt");
+	///////
+	/*ret = createFile("test.txt");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);*/
 
 	/////// 
 	ret = openFile("test.txt"); 
@@ -59,38 +59,25 @@ int main() {
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-	///////
+	char  aBuff[2048];
+
+	int it = 0;
+	while (it < 2048){
+		aBuff[it]= 'a';
+		++it;
+	}
+
+	for(int i = 0; i< 25;++i)writeFile(ret, aBuff, 2048);
+	readFile(ret, aBuff, 2048);
+printf("%.*s\n", 2048,aBuff);
+
+
+ 
+	/*///////
 	char * to_write_bff = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi vitae porta nisi. Etiam urna enim, placerat quis tellus quis, consectetur accumsan ligula. Maecenas ultrices orci id turpis tempus fringilla. Pellentesque viverra tincidunt turpis, non consequat mi laoreet ultrices. Cras massa elit, iaculis a augue et, egestas mattis tellus. Etiam eleifend lectus eu diam iaculis, ut lobortis mi vehicula. Nam ut lacinia justo. Mauris ac massa ex. Phasellus faucibus tristique neque, vel fermentum augue dignissim eu. Integer non erat venenatis, rhoncus dui vitae, convallis neque. In egestas aliquet nisl, eu pellentesque dolor mollis vitae.\nNulla consectetur, metus ac elementum rhoncus, metus purus eleifend libero, eu iaculis enim magna id lorem. Donec eget laoreet ex. Vestibulum vitae leo magna. Pellentesque eget neque dui. Donec neque metus, blandit ut dignissim non, semper vitae libero. Aenean accumsan egestas magna. Ut a cursus metus, eget convallis ex. Mauris commodo mauris sed lorem cursus, vitae tristique metus. P2:Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi vitae porta nisi. Etiam urna enim, placerat quis tellus quis, consectetur accumsan ligula. Maecenas ultrices orci id turpis tempus fringilla. Pellentesque viverra tincidunt turpis, non consequat mi laoreet ultrices. Cras massa elit, iaculis a augue et, egestas mattis tellus. Etiam eleifend lectus eu diam iaculis, ut lobortis mi vehicula. Nam ut lacinia justo. Mauris ac massa ex. Phasellus faucibus tristique neque, vel fermentum augue dignissim eu. Integer non erat venenatis, rhoncus dui vitae, convallis neque. In egestas aliquet nisl, eu pellentesque dolor mollis vitae.\nNulla consectetur, metus ac elementum rhoncus, metus purus eleifend libero, eu iaculis enim magna id lorem. Donec eget laoreet ex. Vestibulum vitae leo magna. Pellentesque eget neque dui. Donec neque metus, blandit ut dignissim non, semper vitae libero. Aenean accumsan egestas magna. Ut a cursus metus, eget convallis ex. Mauris commodo mauris sed lorem cursus, vitae tristique metus. Sorry this is not working from the second block, it just fails :(";
 	int bytes = writeFile(ret, to_write_bff, strlen(to_write_bff)+1);
 	printf("%d %ld\n", bytes, strlen(to_write_bff));
-
-	/////// 
-	int rit = lseekFile(ret,0,FS_SEEK_BEGIN); 
-	if(rit != 0) { 
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1; 
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	char readBff[5000]; 
-	bytes = readFile(ret,readBff,5000);
-	printf("%d\n%s\n", bytes, readBff); 
-
-	///////
-    bytes = writeFile(ret, to_write_bff, strlen(to_write_bff)+1);
-	printf("W_%d %ld\n", bytes, strlen(to_write_bff));
-	///////
-	/////// 
-	rit = lseekFile(ret,0,FS_SEEK_BEGIN); 
-	if(rit != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1; 
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	char readBff2[11000]; 
-	bytes = readFile(ret,readBff2,11000);
-	printf("B_%d\n", bytes); 
-	for(int i = 0; i < bytes; ++i) if(readBff2[i] != '\0')printf("%c", readBff2[i]);
-	printf("\n");
+*/
 	///////
 	int rot = closeFile(ret);
 	if(rot != 0) {
@@ -106,8 +93,13 @@ int main() {
 		return -1;
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	ret = openFile("test.txt"); 
+	if(ret < 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
 
-	/////// 
+	/////// */
 
 	return 0;
 }
